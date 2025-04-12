@@ -192,9 +192,12 @@ export const useWatermarkManager = () => {
     setSourceImages(prev => {
       return prev.map(img => {
         if (img.id !== sourceImageId) {
+          // Create deep copy and ensure proper typing
+          const watermarksCopy = JSON.parse(JSON.stringify(sourceImage.watermarks)) as Watermark[];
+          
           return {
             ...img,
-            watermarks: JSON.parse(JSON.stringify(sourceImage.watermarks))
+            watermarks: watermarksCopy
           };
         }
         return img;
