@@ -105,3 +105,12 @@
 .loading-spinner {
   @apply w-8 h-8 border-4 border-watermark-light-blue border-t-watermark-blue rounded-full animate-spin-slow;
 }
+
+/* Text watermark with stroke */
+.text-stroke {
+  text-shadow: 
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000;
+}

@@ -11,7 +11,9 @@ import {
   WatermarkConfig, 
   WatermarkedImage, 
   applyWatermark,
-  generateZip
+  generateZip,
+  createWatermarkPreview,
+  DEFAULT_WATERMARK_OPTIONS
 } from '@/utils/imageProcessing';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
@@ -49,6 +51,7 @@ const Index: React.FC = () => {
       
       // Process each image
       const updatedImages = [...images];
+      const watermarkPreview = await createWatermarkPreview(watermarkConfig);
       
       for (let i = 0; i < updatedImages.length; i++) {
         const image = updatedImages[i];
@@ -63,14 +66,17 @@ const Index: React.FC = () => {
             img.onerror = reject;
           });
           
-          // Apply watermark
-          const watermarkedUrl = await applyWatermark(img, watermarkConfig);
+          // Apply watermark with image-specific config if available
+          const configToApply = image.customWatermarkConfig || watermarkConfig;
+          const watermarkedUrl = await applyWatermark(img, configToApply);
           
           // Update image
           updatedImages[i] = {
             ...image,
             watermarkedUrl,
-            isProcessing: false
+            watermarkPreview,
+            isProcessing: false,
+            customWatermarkConfig: image.customWatermarkConfig || { ...watermarkConfig }
           };
           
           // Update state with progress
@@ -109,6 +115,79 @@ const Index: React.FC = () => {
   const handleWatermarkChange = useCallback((config: WatermarkConfig) => {
     setWatermarkConfig(config);
   }, []);
+
+  // Handle individual image watermark config changes
+  const handleImageConfigChange = useCallback((imageId: string, config: WatermarkConfig) => {
+    setImages(prev => 
+      prev.map(img => 
+        img.id === imageId 
+          ? { ...img, customWatermarkConfig: config } 
+          : img
+      )
+    );
+    
+    // Reprocess the specific image with the new config
+    setImages(prev => {
+      const updatedImages = [...prev];
+      const imageIndex = updatedImages.findIndex(img => img.id === imageId);
+      
+      if (imageIndex >= 0) {
+        updatedImages[imageIndex] = {
+          ...updatedImages[imageIndex],
+          isProcessing: true
+        };
+      }
+      
+      return updatedImages;
+    });
+    
+    // Process the image with its new configuration
+    (async () => {
+      try {
+        const image = images.find(img => img.id === imageId);
+        if (!image) return;
+        
+        const img = new Image();
+        img.src = image.originalUrl;
+        
+        // Wait for image to load
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+        
+        // Apply watermark with the new config
+        const watermarkedUrl = await applyWatermark(img, config);
+        
+        // Update just this image
+        setImages(prev => 
+          prev.map(img => 
+            img.id === imageId 
+              ? { 
+                  ...img, 
+                  watermarkedUrl, 
+                  customWatermarkConfig: config,
+                  isProcessing: false 
+                } 
+              : img
+          )
+        );
+      } catch (error) {
+        console.error('Error updating image watermark:', error);
+        
+        // Mark as failed but not processing
+        setImages(prev => 
+          prev.map(img => 
+            img.id === imageId 
+              ? { ...img, isProcessing: false } 
+              : img
+          )
+        );
+        
+        toast.error('Failed to update watermark position');
+      }
+    })();
+  }, [images]);
 
   // Delete an image
   const handleDeleteImage = useCallback((id: string) => {
@@ -188,6 +267,8 @@ const Index: React.FC = () => {
               onDownloadImage={handleDownloadImage}
               onDownloadAll={handleDownloadAll}
               isProcessing={isProcessing}
+              watermarkConfig={watermarkConfig}
+              onImageConfigChange={handleImageConfigChange}
             />
           </div>
           

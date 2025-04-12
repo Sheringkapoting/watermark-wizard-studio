@@ -1,4 +1,3 @@
-
 export interface WatermarkOptions {
   position: 'center' | 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight' | 'custom';
   customPosition?: { x: number; y: number };
@@ -12,7 +11,9 @@ export interface WatermarkedImage {
   originalFile: File;
   originalUrl: string;
   watermarkedUrl: string | null;
+  watermarkPreview?: string | null;
   isProcessing: boolean;
+  customWatermarkConfig?: WatermarkConfig;
 }
 
 export interface WatermarkConfig {
@@ -22,7 +23,8 @@ export interface WatermarkConfig {
 }
 
 export const DEFAULT_WATERMARK_OPTIONS: WatermarkOptions = {
-  position: 'bottomRight',
+  position: 'custom',
+  customPosition: { x: 0.5, y: 0.5 },
   scale: 0.2,
   opacity: 0.7,
   rotation: 0
@@ -221,6 +223,29 @@ const applyTextWatermark = (
 
   // Restore context state
   ctx.restore();
+};
+
+/**
+ * Create a watermark preview image (for overlay display)
+ */
+export const createWatermarkPreview = (
+  watermarkConfig: WatermarkConfig
+): Promise<string | null> => {
+  return new Promise((resolve) => {
+    if (watermarkConfig.type === 'image' && watermarkConfig.content instanceof File) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target && typeof e.target.result === 'string') {
+          resolve(e.target.result);
+        } else {
+          resolve(null);
+        }
+      };
+      reader.readAsDataURL(watermarkConfig.content);
+    } else {
+      resolve(null);
+    }
+  });
 };
 
 /**
