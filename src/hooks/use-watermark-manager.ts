@@ -259,7 +259,7 @@ export const useWatermarkManager = () => {
               const wmImg = new Image();
               const loadWm = new Promise<void>((resolve) => {
                 wmImg.onload = () => resolve();
-                wmImg.src = watermark.src;
+                wmImg.src = (watermark as ImageWatermark).src;
               });
               await loadWm;
               
@@ -291,14 +291,14 @@ export const useWatermarkManager = () => {
               ctx.globalAlpha = watermark.opacity;
               
               // Set font properties
-              const fontSize = watermark.fontSize * watermark.scale;
-              ctx.font = `${watermark.fontWeight} ${fontSize}px ${watermark.fontFamily}`;
-              ctx.fillStyle = watermark.color;
+              const fontSize = (watermark as TextWatermark).fontSize * watermark.scale;
+              ctx.font = `${(watermark as TextWatermark).fontWeight} ${fontSize}px ${(watermark as TextWatermark).fontFamily}`;
+              ctx.fillStyle = (watermark as TextWatermark).color;
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
               
               // Measure text width (approximate)
-              const textWidth = ctx.measureText(watermark.content).width;
+              const textWidth = ctx.measureText((watermark as TextWatermark).content).width;
               
               // Calculate position
               const posX = canvas.width * watermark.position.x;
@@ -309,7 +309,7 @@ export const useWatermarkManager = () => {
               ctx.rotate((watermark.rotation * Math.PI) / 180);
               
               // Draw text
-              ctx.fillText(watermark.content, 0, 0);
+              ctx.fillText((watermark as TextWatermark).content, 0, 0);
             }
             
             ctx.restore();
