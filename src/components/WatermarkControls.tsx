@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { WatermarkConfig, WatermarkOptions, DEFAULT_WATERMARK_OPTIONS } from '@/utils/imageProcessing';
-import { ImageIcon, Type, Upload } from 'lucide-react';
+import { ImageIcon, Type, Upload, Plus, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface WatermarkControlsProps {
@@ -68,7 +68,7 @@ const WatermarkControls: React.FC<WatermarkControlsProps> = ({
     });
   };
 
-  const applyWatermark = () => {
+  const addWatermark = () => {
     if (watermarkType === 'text') {
       if (!watermarkText.trim()) {
         toast.error('Please enter watermark text');
@@ -76,10 +76,17 @@ const WatermarkControls: React.FC<WatermarkControlsProps> = ({
       }
       
       onWatermarkChange({
+        id: '', // Will be generated in the hook
         type: 'text',
         content: watermarkText,
         options
       });
+      
+      // Reset for next watermark
+      setWatermarkText('© Watermark');
+      setOptions(DEFAULT_WATERMARK_OPTIONS);
+      
+      toast.success('Text watermark added');
     } else {
       if (!watermarkImage) {
         toast.error('Please select a watermark image');
@@ -87,16 +94,27 @@ const WatermarkControls: React.FC<WatermarkControlsProps> = ({
       }
       
       onWatermarkChange({
+        id: '', // Will be generated in the hook
         type: 'image',
         content: watermarkImage,
         options
       });
+      
+      // Reset for next watermark
+      setWatermarkImage(null);
+      setWatermarkImagePreview(null);
+      setOptions(DEFAULT_WATERMARK_OPTIONS);
+      
+      toast.success('Image watermark added');
     }
   };
 
   return (
     <div className="bg-card p-6 rounded-lg shadow-sm border animate-fade-in">
-      <h2 className="text-xl font-semibold mb-4">Watermark Settings</h2>
+      <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+        <Layers className="h-5 w-5" />
+        <span>Add Watermark</span>
+      </h2>
       
       <Tabs defaultValue="text" onValueChange={(value) => setWatermarkType(value as 'text' | 'image')}>
         <TabsList className="grid w-full grid-cols-2 mb-4">
@@ -195,8 +213,8 @@ const WatermarkControls: React.FC<WatermarkControlsProps> = ({
               <Label htmlFor="bottomLeft">Bottom Left</Label>
             </div>
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="custom" id="custom" disabled />
-              <Label htmlFor="custom" className="text-muted-foreground">Custom</Label>
+              <RadioGroupItem value="custom" id="custom" />
+              <Label htmlFor="custom">Custom</Label>
             </div>
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="bottomRight" id="bottomRight" />
@@ -253,10 +271,11 @@ const WatermarkControls: React.FC<WatermarkControlsProps> = ({
       
       <Button 
         className="w-full mt-6" 
-        onClick={applyWatermark}
+        onClick={addWatermark}
         disabled={isProcessing || !hasImages}
       >
-        Apply Watermark
+        <Plus className="h-4 w-4 mr-2" />
+        Add Watermark
       </Button>
     </div>
   );

@@ -13,10 +13,12 @@ export interface WatermarkedImage {
   watermarkedUrl: string | null;
   watermarkPreview?: string | null;
   isProcessing: boolean;
-  customWatermarkConfig?: WatermarkConfig;
+  watermarks: WatermarkConfig[];
+  selectedWatermarkIndex: number;
 }
 
 export interface WatermarkConfig {
+  id: string;
   type: 'image' | 'text';
   content: string | File;
   options: WatermarkOptions;
@@ -223,6 +225,59 @@ const applyTextWatermark = (
 
   // Restore context state
   ctx.restore();
+};
+
+/**
+ * Apply multiple watermarks to an image
+ */
+export const applyMultipleWatermarks = (
+  image: HTMLImageElement,
+  watermarks: WatermarkConfig[]
+): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    try {
+      // Create canvas
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Could not create canvas context'));
+        return;
+      }
+
+      // Set canvas dimensions
+      canvas.width = image.width;
+      canvas.height = image.height;
+
+      // Draw original image
+      ctx.drawImage(image, 0, 0, image.width, image.height);
+
+      // Apply each watermark sequentially
+      const applyWatermarksSequentially = async () => {
+        for (const watermark of watermarks) {
+          if (watermark.type === 'image' && watermark.content instanceof File) {
+            // Image watermark
+            const watermarkImg = new Image();
+            await new Promise<void>((resolveImg, rejectImg) => {
+              watermarkImg.onload = () => {
+                applyImageWatermark(ctx, watermarkImg, image.width, image.height, watermark.options);
+                resolveImg();
+              };
+              watermarkImg.onerror = () => rejectImg(new Error('Failed to load watermark image'));
+              watermarkImg.src = URL.createObjectURL(watermark.content);
+            });
+          } else if (watermark.type === 'text' && typeof watermark.content === 'string') {
+            // Text watermark
+            applyTextWatermark(ctx, watermark.content, image.width, image.height, watermark.options);
+          }
+        }
+        resolve(canvas.toDataURL('image/jpeg', 0.9));
+      };
+
+      applyWatermarksSequentially().catch(reject);
+    } catch (error) {
+      reject(error);
+    }
+  });
 };
 
 /**

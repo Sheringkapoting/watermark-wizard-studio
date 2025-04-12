@@ -1,9 +1,10 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, Trash2, Loader2, Copy, Move, RotateCw } from 'lucide-react';
-import { WatermarkedImage, WatermarkConfig, applyWatermark } from '@/utils/imageProcessing';
+import { Download, Trash2, Loader2, Copy, Move, RotateCw, Plus, X, Layers } from 'lucide-react';
+import { WatermarkedImage, WatermarkConfig } from '@/utils/imageProcessing';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 
 interface ImagePreviewProps {
   images: WatermarkedImage[];
@@ -11,8 +12,10 @@ interface ImagePreviewProps {
   onDownloadImage: (image: WatermarkedImage) => void;
   onDownloadAll: () => void;
   isProcessing: boolean;
-  watermarkConfig: WatermarkConfig | null;
-  onImageConfigChange: (id: string, config: WatermarkConfig) => void;
+  onSelectWatermark: (imageId: string, watermarkIndex: number) => void;
+  onUpdateWatermark: (imageId: string, watermarkId: string, config: Partial<WatermarkConfig>) => void;
+  onRemoveWatermark: (imageId: string, watermarkId: string) => void;
+  onApplyWatermarkToAll: (sourceImageId: string, watermarkId: string) => void;
 }
 
 const ImagePreview: React.FC<ImagePreviewProps> = ({
@@ -21,29 +24,35 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({
   onDownloadImage,
   onDownloadAll,
   isProcessing,
-  watermarkConfig,
-  onImageConfigChange
+  onSelectWatermark,
+  onUpdateWatermark,
+  onRemoveWatermark,
+  onApplyWatermarkToAll
 }) => {
   const [activeImageId, setActiveImageId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
   
   if (images.length === 0) {
     return null;
   }
 
-  const handleWatermarkDragStart = (e: React.MouseEvent, imageId: string) => {
-    if (!watermarkConfig || isProcessing) return;
+  const handleWatermarkDragStart = (e: React.MouseEvent, imageId: string, watermarkId: string) => {
+    if (isProcessing) return;
     setActiveImageId(imageId);
     setIsDragging(true);
     e.stopPropagation();
   };
 
-  const handleWatermarkDragMove = (e: React.MouseEvent, imageId: string, imgElement: HTMLImageElement) => {
-    if (!isDragging || activeImageId !== imageId || !watermarkConfig) return;
+  const handleWatermarkDragMove = (e: React.MouseEvent, imageId: string, watermarkId: string, imgElement: HTMLImageElement) => {
+    if (!isDragging || activeImageId !== imageId) return;
     
     const image = images.find(img => img.id === imageId);
-    if (!image || !image.customWatermarkConfig) return;
+    if (!image) return;
+    
+    const watermarkIndex = image.watermarks.findIndex(w => w.id === watermarkId);
+    if (watermarkIndex === -1) return;
+    
+    const watermark = image.watermarks[watermarkIndex];
     
     const rect = imgElement.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
@@ -53,16 +62,13 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({
     const boundedX = Math.max(0, Math.min(1, x));
     const boundedY = Math.max(0, Math.min(1, y));
     
-    const updatedConfig = {
-      ...image.customWatermarkConfig,
-      options: {
-        ...image.customWatermarkConfig.options,
-        position: 'custom' as const,
-        customPosition: { x: boundedX, y: boundedY }
-      }
+    const updatedOptions = {
+      ...watermark.options,
+      position: 'custom' as const,
+      customPosition: { x: boundedX, y: boundedY }
     };
     
-    onImageConfigChange(imageId, updatedConfig);
+    onUpdateWatermark(imageId, watermarkId, { options: updatedOptions });
   };
 
   const handleWatermarkDragEnd = () => {
@@ -70,38 +76,27 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({
     setActiveImageId(null);
   };
 
-  const handleWatermarkResize = (e: React.WheelEvent, imageId: string) => {
-    if (!watermarkConfig || isProcessing) return;
+  const handleWatermarkResize = (e: React.WheelEvent, imageId: string, watermarkId: string) => {
+    if (isProcessing) return;
     e.preventDefault();
     
     const image = images.find(img => img.id === imageId);
-    if (!image || !image.customWatermarkConfig) return;
+    if (!image) return;
+    
+    const watermarkIndex = image.watermarks.findIndex(w => w.id === watermarkId);
+    if (watermarkIndex === -1) return;
+    
+    const watermark = image.watermarks[watermarkIndex];
     
     const scaleChange = e.deltaY > 0 ? -0.01 : 0.01;
-    const newScale = Math.max(0.05, Math.min(0.5, image.customWatermarkConfig.options.scale + scaleChange));
+    const newScale = Math.max(0.05, Math.min(0.5, watermark.options.scale + scaleChange));
     
-    const updatedConfig = {
-      ...image.customWatermarkConfig,
-      options: {
-        ...image.customWatermarkConfig.options,
-        scale: newScale
-      }
+    const updatedOptions = {
+      ...watermark.options,
+      scale: newScale
     };
     
-    onImageConfigChange(imageId, updatedConfig);
-  };
-
-  const applyConfigToAll = (sourceImageId: string) => {
-    const sourceImage = images.find(img => img.id === sourceImageId);
-    if (!sourceImage || !sourceImage.customWatermarkConfig) return;
-    
-    images.forEach(image => {
-      if (image.id !== sourceImageId) {
-        onImageConfigChange(image.id, sourceImage.customWatermarkConfig!);
-      }
-    });
-    
-    toast.success('Watermark settings applied to all images');
+    onUpdateWatermark(imageId, watermarkId, { options: updatedOptions });
   };
 
   return (
@@ -122,9 +117,10 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({
       
       <div className="bg-slate-100 p-2 rounded-md text-sm">
         <ul className="list-disc pl-5 text-muted-foreground">
-          <li>Click and drag the watermark to reposition it</li>
-          <li>Use mouse wheel over an image to resize the watermark</li>
-          <li>Use the copy button to apply one image's settings to all images</li>
+          <li>Click and drag watermarks to reposition them</li>
+          <li>Use mouse wheel over a watermark to resize it</li>
+          <li>Use the copy button to apply a watermark's settings to all images</li>
+          <li>Add multiple watermarks to each image</li>
         </ul>
       </div>
       
@@ -141,50 +137,94 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({
             ) : (
               <div className="relative w-full h-full">
                 <img
-                  src={image.originalUrl}
+                  src={image.watermarkedUrl || image.originalUrl}
                   alt="Preview"
                   className="w-full h-full object-contain"
-                  onMouseMove={(e) => handleWatermarkDragMove(e, image.id, e.currentTarget)}
-                  onMouseUp={handleWatermarkDragEnd}
-                  onMouseLeave={handleWatermarkDragEnd}
-                  onWheel={(e) => handleWatermarkResize(e, image.id)}
                 />
                 
-                {image.watermarkedUrl && !isDragging && (
+                {image.watermarks.map((watermark, index) => (
                   <div 
-                    className={`absolute cursor-move ${isDragging && activeImageId === image.id ? 'opacity-50' : ''}`}
+                    key={watermark.id}
+                    className={`absolute cursor-move ${
+                      isDragging && activeImageId === image.id ? 'opacity-50' : ''
+                    } ${
+                      image.selectedWatermarkIndex === index ? 'ring-2 ring-blue-500' : ''
+                    }`}
                     style={{
-                      top: `${(image.customWatermarkConfig?.options.customPosition?.y || 0.5) * 100}%`,
-                      left: `${(image.customWatermarkConfig?.options.customPosition?.x || 0.5) * 100}%`,
+                      top: `${(watermark.options.customPosition?.y || 0.5) * 100}%`,
+                      left: `${(watermark.options.customPosition?.x || 0.5) * 100}%`,
                       transform: 'translate(-50%, -50%)',
-                      opacity: image.customWatermarkConfig?.options.opacity || 0.7,
-                      rotate: `${image.customWatermarkConfig?.options.rotation || 0}deg`,
-                      pointerEvents: isProcessing ? 'none' : 'auto'
+                      opacity: watermark.options.opacity || 0.7,
+                      rotate: `${watermark.options.rotation || 0}deg`,
+                      pointerEvents: isProcessing ? 'none' : 'auto',
+                      zIndex: 10 + index
                     }}
-                    onMouseDown={(e) => handleWatermarkDragStart(e, image.id)}
+                    onClick={() => onSelectWatermark(image.id, index)}
+                    onMouseDown={(e) => handleWatermarkDragStart(e, image.id, watermark.id)}
+                    onMouseMove={(e) => handleWatermarkDragMove(e, image.id, watermark.id, e.currentTarget.parentElement?.querySelector('img') as HTMLImageElement)}
+                    onMouseUp={handleWatermarkDragEnd}
+                    onMouseLeave={handleWatermarkDragEnd}
+                    onWheel={(e) => handleWatermarkResize(e, image.id, watermark.id)}
                   >
-                    {image.customWatermarkConfig?.type === 'text' ? (
+                    {watermark.type === 'text' ? (
                       <div 
                         className="text-white text-stroke"
                         style={{ 
-                          fontSize: `${Math.max(12, 24 * (image.customWatermarkConfig.options.scale || 0.2))}px`
+                          fontSize: `${Math.max(12, 24 * (watermark.options.scale || 0.2))}px`,
+                          padding: '4px'
                         }}
                       >
-                        {typeof image.customWatermarkConfig.content === 'string' ? 
-                          image.customWatermarkConfig.content : 'Watermark'}
+                        {typeof watermark.content === 'string' ? 
+                          watermark.content : 'Watermark'}
                       </div>
                     ) : (
-                      image.watermarkPreview && (
-                        <img 
-                          src={image.watermarkPreview}
-                          alt="Watermark" 
-                          className="max-w-full pointer-events-none"
-                          style={{ 
-                            width: `${100 * (image.customWatermarkConfig?.options.scale || 0.2)}px`
-                          }}
-                        />
-                      )
+                      <img 
+                        src={
+                          watermark.content instanceof File ? 
+                            URL.createObjectURL(watermark.content) : 
+                            '#'
+                        }
+                        alt="Watermark" 
+                        className="max-w-full pointer-events-none"
+                        style={{ 
+                          width: `${100 * (watermark.options.scale || 0.2)}px`
+                        }}
+                        onLoad={(e) => {
+                          if (watermark.content instanceof File) {
+                            URL.revokeObjectURL((e.target as HTMLImageElement).src);
+                          }
+                        }}
+                      />
                     )}
+                    
+                    {image.selectedWatermarkIndex === index && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-5 w-5 bg-white rounded-full border-gray-300 hover:bg-red-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveWatermark(image.id, watermark.id);
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                
+                {image.watermarks.length > 0 && (
+                  <div className="absolute top-2 right-2 flex gap-1">
+                    {image.watermarks.map((watermark, index) => (
+                      <Badge 
+                        key={watermark.id} 
+                        variant={image.selectedWatermarkIndex === index ? "default" : "outline"}
+                        className="cursor-pointer"
+                        onClick={() => onSelectWatermark(image.id, index)}
+                      >
+                        {index + 1}
+                      </Badge>
+                    ))}
                   </div>
                 )}
               </div>
@@ -202,16 +242,23 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({
                   <Trash2 className="h-4 w-4" />
                 </Button>
                 
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => applyConfigToAll(image.id)}
-                  disabled={isProcessing || !image.customWatermarkConfig}
-                  className="h-8 w-8 text-white hover:text-white hover:bg-green-500/40"
-                  title="Apply this watermark to all images"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
+                {image.watermarks.length > 0 && image.selectedWatermarkIndex >= 0 && (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => {
+                      const selectedWatermark = image.watermarks[image.selectedWatermarkIndex];
+                      if (selectedWatermark) {
+                        onApplyWatermarkToAll(image.id, selectedWatermark.id);
+                      }
+                    }}
+                    disabled={isProcessing || image.watermarks.length === 0}
+                    className="h-8 w-8 text-white hover:text-white hover:bg-green-500/40"
+                    title="Apply this watermark to all images"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
               
               <Button 

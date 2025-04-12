@@ -17,7 +17,10 @@ const Index: React.FC = () => {
     isProcessing,
     handleImagesSelected,
     handleWatermarkChange,
-    handleImageConfigChange,
+    handleSelectWatermark,
+    handleUpdateWatermark,
+    handleRemoveWatermark,
+    applyWatermarkToAll,
     setImages
   } = useWatermarkProcessor();
   
@@ -59,8 +62,10 @@ const Index: React.FC = () => {
               onDownloadImage={handleDownloadImage}
               onDownloadAll={handleDownloadAll}
               isProcessing={isProcessing}
-              watermarkConfig={watermarkConfig}
-              onImageConfigChange={handleImageConfigChange}
+              onSelectWatermark={handleSelectWatermark}
+              onUpdateWatermark={handleUpdateWatermark}
+              onRemoveWatermark={handleRemoveWatermark}
+              onApplyWatermarkToAll={applyWatermarkToAll}
             />
           </div>
           
