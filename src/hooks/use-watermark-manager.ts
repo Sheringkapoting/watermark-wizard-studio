@@ -13,6 +13,7 @@ export const useWatermarkManager = () => {
     return sourceImages[currentImageIndex] || null;
   }, [sourceImages, currentImageIndex]);
 
+  // Handle source image upload
   const addSourceImages = useCallback((files: FileList) => {
     const newImages: SourceImage[] = [];
     
@@ -43,6 +44,7 @@ export const useWatermarkManager = () => {
     });
   }, [sourceImages]);
 
+  // Add watermark image
   const addImageWatermark = useCallback((file: File) => {
     if (sourceImages.length === 0) {
       toast({
@@ -80,6 +82,7 @@ export const useWatermarkManager = () => {
     reader.readAsDataURL(file);
   }, [sourceImages, currentImageIndex]);
 
+  // Add text watermark
   const addTextWatermark = useCallback((text: string) => {
     if (sourceImages.length === 0) {
       toast({
@@ -126,6 +129,7 @@ export const useWatermarkManager = () => {
     });
   }, [sourceImages, currentImageIndex]);
 
+  // Update watermark properties
   const updateWatermark = useCallback((imageId: string, watermarkId: string, updates: Partial<Watermark>) => {
     setSourceImages(prev => {
       return prev.map(img => {
@@ -142,6 +146,7 @@ export const useWatermarkManager = () => {
     });
   }, []);
 
+  // Remove a watermark
   const removeWatermark = useCallback((imageId: string, watermarkId: string) => {
     setSourceImages(prev => {
       return prev.map(img => {
@@ -161,6 +166,7 @@ export const useWatermarkManager = () => {
     });
   }, []);
 
+  // Remove a source image
   const removeSourceImage = useCallback((imageId: string) => {
     setSourceImages(prev => {
       const newImages = prev.filter(img => img.id !== imageId);
@@ -178,6 +184,7 @@ export const useWatermarkManager = () => {
     });
   }, [currentImageIndex]);
 
+  // Apply watermarks from one image to all images
   const applyWatermarksToAll = useCallback((sourceImageId: string) => {
     const sourceImage = sourceImages.find(img => img.id === sourceImageId);
     if (!sourceImage) return;
@@ -185,45 +192,9 @@ export const useWatermarkManager = () => {
     setSourceImages(prev => {
       return prev.map(img => {
         if (img.id !== sourceImageId) {
-          // Fix: Use a type-safe deep copy approach
-          const watermarksCopy: Watermark[] = [];
-          
-          // Process each watermark with proper type checking
-          sourceImage.watermarks.forEach(wm => {
-            if (wm.type === 'image') {
-              const imageCopy: ImageWatermark = {
-                id: uuidv4(), // Generate new ID for the copy
-                type: 'image',
-                src: (wm as ImageWatermark).src,
-                position: { ...wm.position },
-                opacity: wm.opacity,
-                scale: wm.scale,
-                rotation: wm.rotation,
-                zIndex: wm.zIndex
-              };
-              watermarksCopy.push(imageCopy);
-            } else {
-              const textCopy: TextWatermark = {
-                id: uuidv4(), // Generate new ID for the copy
-                type: 'text',
-                content: (wm as TextWatermark).content,
-                fontFamily: (wm as TextWatermark).fontFamily,
-                fontSize: (wm as TextWatermark).fontSize,
-                fontWeight: (wm as TextWatermark).fontWeight,
-                color: (wm as TextWatermark).color,
-                position: { ...wm.position },
-                opacity: wm.opacity,
-                scale: wm.scale,
-                rotation: wm.rotation,
-                zIndex: wm.zIndex
-              };
-              watermarksCopy.push(textCopy);
-            }
-          });
-          
           return {
             ...img,
-            watermarks: watermarksCopy
+            watermarks: JSON.parse(JSON.stringify(sourceImage.watermarks))
           };
         }
         return img;
@@ -236,6 +207,7 @@ export const useWatermarkManager = () => {
     });
   }, [sourceImages]);
 
+  // Process all images with their watermarks
   const processAllImages = useCallback(async () => {
     if (sourceImages.length === 0) {
       toast({
@@ -287,7 +259,7 @@ export const useWatermarkManager = () => {
               const wmImg = new Image();
               const loadWm = new Promise<void>((resolve) => {
                 wmImg.onload = () => resolve();
-                wmImg.src = (watermark as ImageWatermark).src;
+                wmImg.src = watermark.src;
               });
               await loadWm;
               
@@ -319,14 +291,14 @@ export const useWatermarkManager = () => {
               ctx.globalAlpha = watermark.opacity;
               
               // Set font properties
-              const fontSize = (watermark as TextWatermark).fontSize * watermark.scale;
-              ctx.font = `${(watermark as TextWatermark).fontWeight} ${fontSize}px ${(watermark as TextWatermark).fontFamily}`;
-              ctx.fillStyle = (watermark as TextWatermark).color;
+              const fontSize = watermark.fontSize * watermark.scale;
+              ctx.font = `${watermark.fontWeight} ${fontSize}px ${watermark.fontFamily}`;
+              ctx.fillStyle = watermark.color;
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
               
               // Measure text width (approximate)
-              const textWidth = ctx.measureText((watermark as TextWatermark).content).width;
+              const textWidth = ctx.measureText(watermark.content).width;
               
               // Calculate position
               const posX = canvas.width * watermark.position.x;
@@ -337,7 +309,7 @@ export const useWatermarkManager = () => {
               ctx.rotate((watermark.rotation * Math.PI) / 180);
               
               // Draw text
-              ctx.fillText((watermark as TextWatermark).content, 0, 0);
+              ctx.fillText(watermark.content, 0, 0);
             }
             
             ctx.restore();
@@ -371,6 +343,7 @@ export const useWatermarkManager = () => {
     }
   }, [sourceImages]);
 
+  // Download a processed image
   const downloadImage = useCallback((imageId: string) => {
     const image = sourceImages.find(img => img.id === imageId);
     if (!image || !image.resultSrc) {
@@ -395,6 +368,7 @@ export const useWatermarkManager = () => {
     });
   }, [sourceImages]);
 
+  // Download all processed images as a zip
   const downloadAllImages = useCallback(() => {
     const processedImages = sourceImages.filter(img => img.resultSrc);
     if (processedImages.length === 0) {
