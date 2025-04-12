@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { Watermark, SourceImage, Position, TextWatermark, ImageWatermark } from '@/types/watermark';
 import { toast } from '@/hooks/use-toast';
@@ -184,12 +185,39 @@ export const useWatermarkManager = () => {
     setSourceImages(prev => {
       return prev.map(img => {
         if (img.id !== sourceImageId) {
-          // Create deep copy with proper type handling
-          const watermarksCopy: Watermark[] = JSON.parse(JSON.stringify(sourceImage.watermarks)).map((wm: any) => {
+          // Fix: Use a type-safe deep copy approach
+          const watermarksCopy: Watermark[] = [];
+          
+          // Process each watermark with proper type checking
+          sourceImage.watermarks.forEach(wm => {
             if (wm.type === 'image') {
-              return wm as ImageWatermark;
+              const imageCopy: ImageWatermark = {
+                id: uuidv4(), // Generate new ID for the copy
+                type: 'image',
+                src: (wm as ImageWatermark).src,
+                position: { ...wm.position },
+                opacity: wm.opacity,
+                scale: wm.scale,
+                rotation: wm.rotation,
+                zIndex: wm.zIndex
+              };
+              watermarksCopy.push(imageCopy);
             } else {
-              return wm as TextWatermark;
+              const textCopy: TextWatermark = {
+                id: uuidv4(), // Generate new ID for the copy
+                type: 'text',
+                content: (wm as TextWatermark).content,
+                fontFamily: (wm as TextWatermark).fontFamily,
+                fontSize: (wm as TextWatermark).fontSize,
+                fontWeight: (wm as TextWatermark).fontWeight,
+                color: (wm as TextWatermark).color,
+                position: { ...wm.position },
+                opacity: wm.opacity,
+                scale: wm.scale,
+                rotation: wm.rotation,
+                zIndex: wm.zIndex
+              };
+              watermarksCopy.push(textCopy);
             }
           });
           
