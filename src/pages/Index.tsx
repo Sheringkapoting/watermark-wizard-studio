@@ -1,16 +1,22 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Download, Image as ImageIcon, Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Download, Image as ImageIcon, Plus, Upload } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-
-import { ImageUploader } from "@/components/watermark/ImageUploader";
-import { ImageEditor } from "@/components/watermark/ImageEditor";
-import { WatermarkList } from "@/components/watermark/WatermarkList";
-import { ResultPreview } from "@/components/watermark/ResultPreview";
-import { Instructions } from "@/components/watermark/Instructions";
-import { DownloadDialog } from "@/components/watermark/DownloadDialog";
 import { ImageFormat, Watermark } from "@/types/watermark";
 
 const Index = () => {
@@ -148,14 +154,14 @@ const Index = () => {
           const scaledHeight = watermarkImg.height * watermark.scale;
           
           // Calculate position using the same relative positioning formula as in the preview
-          const posX = (canvas.width - scaledWidth) * watermark.position.x;
-          const posY = (canvas.height - scaledHeight) * watermark.position.y;
+          const posX = canvas.width * watermark.position.x;
+          const posY = canvas.height * watermark.position.y;
           
           ctx.save();
           
           // Apply the same transformation as in the preview
-          // Translate to the position point plus half the watermark dimensions
-          ctx.translate(posX + (scaledWidth / 2), posY + (scaledHeight / 2));
+          // Translate to the position point
+          ctx.translate(posX, posY);
           
           // Apply the same rotation as in the preview
           ctx.rotate((watermark.rotation * Math.PI) / 180);
@@ -383,6 +389,458 @@ const Index = () => {
       window.removeEventListener('touchend', handleDragEnd);
     };
   }, [watermarks, handleDrag, handleDragEnd]);
+
+  // ImageUploader Component
+  const ImageUploader = ({ 
+    id, 
+    onUpload, 
+    buttonText, 
+    description 
+  }: {
+    id: string;
+    onUpload: (imageSrc: string, fileName: string, fileType: string) => void;
+    buttonText: string;
+    description: string;
+  }) => {
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const imageSrc = e.target?.result as string;
+          onUpload(imageSrc, file.name.split('.')[0], file.type);
+        };
+        reader.readAsDataURL(file);
+        toast({
+          title: "Image Uploaded",
+          description: "Image has been loaded successfully.",
+        });
+      }
+    };
+
+    return (
+      <div className="text-center p-10 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 w-full">
+        <div className="mb-4">
+          <ImageIcon className="h-12 w-12 mx-auto text-gray-400" />
+          <h3 className="mt-2 text-sm font-semibold text-gray-900">No image selected</h3>
+          <p className="mt-1 text-sm text-gray-500">{description}</p>
+        </div>
+        <Input
+          id={id}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageUpload}
+        />
+        <label htmlFor={id}>
+          <Button asChild variant="default">
+            <span>
+              <Upload className="h-4 w-4 mr-2" />
+              {buttonText}
+            </span>
+          </Button>
+        </label>
+      </div>
+    );
+  };
+
+  // WatermarkImage Component
+  const WatermarkImage = ({ 
+    watermark, 
+    onDragStart 
+  }: {
+    watermark: Watermark;
+    onDragStart: (id: string, e: React.MouseEvent<HTMLImageElement> | React.TouchEvent<HTMLImageElement>) => void;
+  }) => {
+    return (
+      <img
+        key={watermark.id}
+        src={watermark.src}
+        alt={`Watermark ${watermark.id}`}
+        className="absolute pointer-events-auto cursor-move"
+        style={{
+          opacity: watermark.opacity,
+          transform: `translate(-50%, -50%) scale(${watermark.scale}) rotate(${watermark.rotation}deg)`,
+          left: `${watermark.position.x * 100}%`,
+          top: `${watermark.position.y * 100}%`,
+          maxWidth: "100%",
+          maxHeight: "100%",
+          touchAction: "none",
+          zIndex: 10,
+        }}
+        onMouseDown={(e) => onDragStart(watermark.id, e)}
+        onTouchStart={(e) => onDragStart(watermark.id, e)}
+      />
+    );
+  };
+
+  // WatermarkItem Component
+  const WatermarkItem = ({ 
+    watermark, 
+    index, 
+    onRemove, 
+    onUpdate 
+  }: {
+    watermark: Watermark;
+    index: number;
+    onRemove: (id: string) => void;
+    onUpdate: (id: string, update: Partial<Watermark>) => void;
+  }) => {
+    return (
+      <div className="border rounded-lg p-4">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-medium">Watermark {index + 1}</h3>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 w-7 p-0" 
+            onClick={() => onRemove(watermark.id)}
+          >
+            &times;
+          </Button>
+        </div>
+        
+        <div className="bg-gray-100 p-4 rounded-md mb-4 flex justify-center">
+          <img
+            src={watermark.src}
+            alt={`Watermark ${index + 1}`}
+            className="max-h-24 max-w-full object-contain"
+          />
+        </div>
+        
+        <div className="space-y-4">
+          <div>
+            <div className="flex justify-between mb-2">
+              <Label htmlFor={`opacity-${watermark.id}`}>
+                Opacity: {Math.round(watermark.opacity * 100)}%
+              </Label>
+            </div>
+            <Slider
+              id={`opacity-${watermark.id}`}
+              min={0}
+              max={1}
+              step={0.01}
+              value={[watermark.opacity]}
+              onValueChange={([value]) => 
+                onUpdate(watermark.id, { opacity: value })
+              }
+            />
+          </div>
+          
+          <div>
+            <div className="flex justify-between mb-2">
+              <Label htmlFor={`scale-${watermark.id}`}>
+                Size: {Math.round(watermark.scale * 100)}%
+              </Label>
+            </div>
+            <Slider
+              id={`scale-${watermark.id}`}
+              min={0.1}
+              max={2}
+              step={0.01}
+              value={[watermark.scale]}
+              onValueChange={([value]) => 
+                onUpdate(watermark.id, { scale: value })
+              }
+            />
+          </div>
+          
+          <div>
+            <div className="flex justify-between mb-2">
+              <Label htmlFor={`rotation-${watermark.id}`}>
+                Rotation: {watermark.rotation}°
+              </Label>
+            </div>
+            <Slider
+              id={`rotation-${watermark.id}`}
+              min={0}
+              max={360}
+              step={1}
+              value={[watermark.rotation]}
+              onValueChange={([value]) => 
+                onUpdate(watermark.id, { rotation: value })
+              }
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // WatermarkList Component
+  const WatermarkList = ({
+    watermarks,
+    onWatermarkUpload,
+    onWatermarkRemove,
+    onWatermarkUpdate
+  }: {
+    watermarks: Watermark[];
+    onWatermarkUpload: (src: string) => void;
+    onWatermarkRemove: (id: string) => void;
+    onWatermarkUpdate: (id: string, update: Partial<Watermark>) => void;
+  }) => {
+    const handleWatermarkImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          onWatermarkUpload(e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+        toast({
+          title: "Watermark Uploaded",
+          description: "Watermark image has been added successfully.",
+        });
+      }
+    };
+
+    return (
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Watermarks</h2>
+        
+        {watermarks.length === 0 ? (
+          <ImageUploader 
+            id="watermark-image-upload-initial"
+            onUpload={(src) => onWatermarkUpload(src)}
+            buttonText="Select Watermark"
+            description="PNG with transparency works best"
+          />
+        ) : (
+          <div className="space-y-6">
+            {watermarks.map((watermark, index) => (
+              <WatermarkItem
+                key={watermark.id}
+                watermark={watermark}
+                index={index}
+                onRemove={onWatermarkRemove}
+                onUpdate={onWatermarkUpdate}
+              />
+            ))}
+            
+            <div>
+              <Input
+                id="watermark-image-upload-additional"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleWatermarkImageUpload}
+              />
+              <label htmlFor="watermark-image-upload-additional">
+                <Button asChild variant="outline" className="w-full">
+                  <span>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Another Watermark
+                  </span>
+                </Button>
+              </label>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ImageEditor Component
+  const ImageEditor = ({
+    sourceImage,
+    watermarks,
+    onDragStart,
+    onChangeImage,
+    onProcessImage,
+    onDownload,
+    resultImage,
+    isProcessing
+  }: {
+    sourceImage: string | null;
+    watermarks: Watermark[];
+    onDragStart: (id: string, e: React.MouseEvent<HTMLImageElement> | React.TouchEvent<HTMLImageElement>) => void;
+    onChangeImage: () => void;
+    onProcessImage: () => void;
+    onDownload: () => void;
+    resultImage: string | null;
+    isProcessing: boolean;
+  }) => {
+    return (
+      <div className="w-full relative">
+        <div className="relative" ref={imageContainerRef}>
+          <img
+            src={sourceImage}
+            alt="Source"
+            className="w-full h-auto rounded-md object-contain max-h-[70vh]"
+          />
+          
+          {watermarks.map((watermark) => (
+            <WatermarkImage
+              key={watermark.id}
+              watermark={watermark}
+              onDragStart={onDragStart}
+            />
+          ))}
+        </div>
+
+        <div className="flex justify-between mt-4">
+          <Button
+            variant="outline"
+            onClick={onChangeImage}
+          >
+            Change Image
+          </Button>
+          
+          <div className="flex gap-2">
+            <Button
+              onClick={onProcessImage}
+              disabled={watermarks.length === 0 || isProcessing}
+            >
+              {isProcessing ? "Processing..." : "Apply Watermark"}
+            </Button>
+            
+            <Button
+              variant="secondary"
+              onClick={onDownload}
+              disabled={!resultImage}
+            >
+              Download
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ResultPreview Component
+  const ResultPreview = ({ 
+    resultImage, 
+    onDownload 
+  }: {
+    resultImage: string;
+    onDownload: () => void;
+  }) => {
+    return (
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Result</h2>
+        <img
+          src={resultImage}
+          alt="Result"
+          className="w-full h-auto rounded-md mb-4"
+        />
+        <Button 
+          onClick={onDownload} 
+          className="w-full"
+        >
+          <Download className="h-4 w-4 mr-2" />
+          Download Image
+        </Button>
+      </div>
+    );
+  };
+
+  // Instructions Component
+  const Instructions = () => {
+    return (
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Instructions</h2>
+        <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700">
+          <li>Upload your source image</li>
+          <li>Add one or more watermark images (PNG with transparency works best)</li>
+          <li>Adjust each watermark's size, opacity, and rotation</li>
+          <li>Drag watermarks to position them exactly where you want</li>
+          <li>Click "Apply Watermark" to process the image</li>
+          <li>Download your watermarked image</li>
+        </ol>
+      </div>
+    );
+  };
+
+  // DownloadDialog Component
+  const DownloadDialog = ({
+    open,
+    onOpenChange,
+    filename,
+    onFilenameChange,
+    selectedFormat,
+    onFormatChange,
+    imageQuality,
+    onQualityChange,
+    onDownload,
+    imageFormats
+  }: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    filename: string;
+    onFilenameChange: (filename: string) => void;
+    selectedFormat: string;
+    onFormatChange: (format: string) => void;
+    imageQuality: number;
+    onQualityChange: (quality: number) => void;
+    onDownload: () => void;
+    imageFormats: ImageFormat[];
+  }) => {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Download Options</DialogTitle>
+            <DialogDescription>
+              Customize your download settings
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="filename">Filename</Label>
+              <Input
+                id="filename"
+                value={filename}
+                onChange={(e) => onFilenameChange(e.target.value)}
+                placeholder="Enter filename"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="format">Image Format</Label>
+              <Select value={selectedFormat} onValueChange={onFormatChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select format" />
+                </SelectTrigger>
+                <SelectContent>
+                  {imageFormats.map((format) => (
+                    <SelectItem key={format.type} value={format.type}>
+                      {format.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {selectedFormat !== "image/png" && selectedFormat !== "original" && (
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label htmlFor="quality">Quality: {Math.round(imageQuality * 100)}%</Label>
+                </div>
+                <Slider
+                  id="quality"
+                  min={0.1}
+                  max={1}
+                  step={0.05}
+                  value={[imageQuality]}
+                  onValueChange={([value]) => onQualityChange(value)}
+                />
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={onDownload}>
+              Download
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
 
   return (
     <div className="min-h-screen w-full bg-gray-50 p-4">
