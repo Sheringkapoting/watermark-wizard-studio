@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,14 +70,12 @@ const Index = () => {
     { type: "image/webp", quality: 0.9, label: "WebP" },
   ];
 
-  // Reset download filename when source image changes
   useEffect(() => {
     if (sourceImageName) {
       setDownloadFilename(sourceImageName);
     }
   }, [sourceImageName]);
   
-  // Load source image and get its dimensions
   const loadSourceImage = (src: string) => {
     return new Promise<{width: number, height: number}>((resolve) => {
       const img = new Image();
@@ -90,7 +87,6 @@ const Index = () => {
     });
   };
 
-  // Handle source image upload
   const handleSourceImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -100,12 +96,10 @@ const Index = () => {
         setSourceImage(imageSrc);
         setResultImage(null);
         
-        // Store the original filename and type
         setSourceImageName(file.name.split('.')[0]);
         setSourceImageType(file.type);
         setDownloadFilename(file.name.split('.')[0]);
         
-        // Load source image dimensions
         await loadSourceImage(imageSrc);
       };
       reader.readAsDataURL(file);
@@ -116,7 +110,6 @@ const Index = () => {
     }
   };
 
-  // Handle watermark image upload
   const handleWatermarkImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -125,7 +118,7 @@ const Index = () => {
         const newWatermark: Watermark = {
           id: `watermark-${Date.now()}`,
           src: e.target?.result as string,
-          opacity: 1.0, // Default to 100% opacity
+          opacity: 1.0,
           scale: 0.5,
           position: { x: 0.5, y: 0.5 },
           rotation: 0,
@@ -143,13 +136,11 @@ const Index = () => {
     }
   };
 
-  // Remove a watermark
   const removeWatermark = (id: string) => {
     setWatermarks(prevWatermarks => prevWatermarks.filter(watermark => watermark.id !== id));
     setResultImage(null);
   };
 
-  // Update watermark settings
   const updateWatermarkSettings = (id: string, update: Partial<Watermark>) => {
     setWatermarks(prevWatermarks => 
       prevWatermarks.map(watermark => 
@@ -159,7 +150,6 @@ const Index = () => {
     setResultImage(null);
   };
 
-  // Process the image with watermarks
   const processImage = useCallback(async () => {
     if (!sourceImage || watermarks.length === 0 || !sourceImageDimensions) {
       toast({
@@ -174,7 +164,6 @@ const Index = () => {
 
     setIsProcessing(true);
     try {
-      // Load source image
       const sourceImg = new Image();
       
       const sourceLoaded = new Promise((resolve) => {
@@ -184,7 +173,6 @@ const Index = () => {
       
       await sourceLoaded;
       
-      // Create canvas with source image dimensions
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       
@@ -192,17 +180,13 @@ const Index = () => {
         throw new Error("Could not get canvas context");
       }
       
-      // Set canvas dimensions to match the source image exactly
       canvas.width = sourceImg.width;
       canvas.height = sourceImg.height;
       
-      // Draw source image
       ctx.drawImage(sourceImg, 0, 0);
       
-      // Store watermark loading promises
       const watermarkLoadPromises = [];
       
-      // Process each watermark
       for (const watermark of watermarks) {
         const watermarkImg = new Image();
         
@@ -212,44 +196,34 @@ const Index = () => {
         });
         
         watermarkLoadPromises.push(watermarkLoaded.then(() => {
-          // Apply opacity to context
           ctx.globalAlpha = watermark.opacity;
           
-          // Calculate watermark size based on the scale relative to the source image
-          const watermarkWidth = watermarkImg.width * watermark.scale;
-          const watermarkHeight = watermarkImg.height * watermark.scale;
+          const scaledWidth = watermarkImg.width * watermark.scale;
+          const scaledHeight = watermarkImg.height * watermark.scale;
           
-          // Calculate absolute position based on the relative position
-          const posX = (canvas.width - watermarkWidth) * watermark.position.x;
-          const posY = (canvas.height - watermarkHeight) * watermark.position.y;
+          const posX = (canvas.width - scaledWidth) * watermark.position.x;
+          const posY = (canvas.height - scaledHeight) * watermark.position.y;
           
-          // Save context state
           ctx.save();
           
-          // Move to the center point for rotation
-          ctx.translate(posX + (watermarkWidth / 2), posY + (watermarkHeight / 2));
+          ctx.translate(posX + (scaledWidth / 2), posY + (scaledHeight / 2));
           
-          // Apply rotation
           ctx.rotate((watermark.rotation * Math.PI) / 180);
           
-          // Draw watermark centered at the rotation point
           ctx.drawImage(
             watermarkImg,
-            -watermarkWidth / 2,
-            -watermarkHeight / 2,
-            watermarkWidth,
-            watermarkHeight
+            -scaledWidth / 2,
+            -scaledHeight / 2,
+            scaledWidth,
+            scaledHeight
           );
           
-          // Restore context state
           ctx.restore();
         }));
       }
       
-      // Wait for all watermarks to be processed
       await Promise.all(watermarkLoadPromises);
       
-      // Convert canvas to data URL maintaining original format
       const dataURL = canvas.toDataURL(sourceImageType, 0.9);
       setResultImage(dataURL);
       
@@ -269,7 +243,6 @@ const Index = () => {
     }
   }, [sourceImage, watermarks, sourceImageDimensions, sourceImageType]);
 
-  // Download processed image in selected format
   const handleDownload = () => {
     if (!resultImage) {
       toast({
@@ -283,7 +256,6 @@ const Index = () => {
     setDownloadDialogOpen(true);
   };
 
-  // Process download with selected format and filename
   const processDownload = () => {
     if (!resultImage) return;
 
@@ -308,7 +280,6 @@ const Index = () => {
       let outputType = sourceImageType;
       let outputQuality = 0.9;
       
-      // Use selected format if not "original"
       if (selectedFormat !== "original") {
         const format = imageFormats.find(f => f.type === selectedFormat);
         if (format) {
@@ -317,7 +288,6 @@ const Index = () => {
         }
       }
       
-      // Get file extension based on mime type
       const getExtension = (mimeType: string) => {
         switch (mimeType) {
           case 'image/jpeg': return '.jpg';
@@ -327,7 +297,6 @@ const Index = () => {
         }
       };
       
-      // Generate download
       const dataURL = canvas.toDataURL(outputType, outputQuality);
       const extension = getExtension(outputType);
       const filename = downloadFilename ? 
@@ -352,7 +321,6 @@ const Index = () => {
     img.src = resultImage;
   };
 
-  // Drag start handler
   const handleDragStart = (id: string, e: React.MouseEvent<HTMLImageElement> | React.TouchEvent<HTMLImageElement>) => {
     if (!imageContainerRef.current) return;
     
@@ -364,24 +332,19 @@ const Index = () => {
     
     const containerRect = imageContainerRef.current.getBoundingClientRect();
     
-    // Get current mouse/touch position
     let clientX: number, clientY: number;
     
     if ('touches' in e) {
-      // Touch event
       clientX = e.touches[0].clientX;
       clientY = e.touches[0].clientY;
     } else {
-      // Mouse event
       clientX = e.clientX;
       clientY = e.clientY;
     }
     
-    // Find the current watermark
     const watermark = watermarks.find(w => w.id === id);
     if (!watermark) return;
     
-    // Store start position for the drag operation
     startPositionRef.current = {
       id,
       x: clientX,
@@ -391,7 +354,6 @@ const Index = () => {
     };
   };
 
-  // Drag handler
   const handleDrag = useCallback((e: MouseEvent | TouchEvent) => {
     if (!startPositionRef.current || !imageContainerRef.current) return;
     
@@ -399,28 +361,22 @@ const Index = () => {
     
     const containerRect = imageContainerRef.current.getBoundingClientRect();
     
-    // Get current mouse/touch position
     let clientX: number, clientY: number;
     
     if ('touches' in e) {
-      // Touch event
       clientX = e.touches[0].clientX;
       clientY = e.touches[0].clientY;
     } else {
-      // Mouse event
       clientX = e.clientX;
       clientY = e.clientY;
     }
     
-    // Calculate the drag delta as a proportion of the container size
     const deltaX = (clientX - startPositionRef.current.x) / containerRect.width;
     const deltaY = (clientY - startPositionRef.current.y) / containerRect.height;
     
-    // Apply the delta to the stored start position
     let newPosX = startPositionRef.current.posX + deltaX;
     let newPosY = startPositionRef.current.posY + deltaY;
     
-    // Clamp values between 0 and 1
     newPosX = Math.max(0, Math.min(1, newPosX));
     newPosY = Math.max(0, Math.min(1, newPosY));
     
@@ -436,7 +392,6 @@ const Index = () => {
     );
   }, []);
 
-  // Drag end handler
   const handleDragEnd = useCallback(() => {
     if (!startPositionRef.current) return;
     
@@ -451,7 +406,6 @@ const Index = () => {
     startPositionRef.current = null;
   }, []);
 
-  // Set up event listeners for drag operations
   useEffect(() => {
     const isDragging = watermarks.some(watermark => watermark.isDragging);
     
@@ -476,7 +430,6 @@ const Index = () => {
         <h1 className="text-3xl font-bold text-center mb-8">Watermark Wizard Studio</h1>
         
         <div className={`grid ${isMobile ? 'grid-cols-1 gap-6' : 'grid-cols-[1fr_380px] gap-8'}`}>
-          {/* Main content area - Image Preview or Upload */}
           <div className="flex flex-col gap-4">
             <Card className="p-6 flex flex-col items-center justify-center">
               {!sourceImage ? (
@@ -591,7 +544,6 @@ const Index = () => {
             )}
           </div>
           
-          {/* Controls Panel */}
           <div className="flex flex-col gap-4">
             <Card className="p-6">
               <h2 className="text-xl font-semibold mb-4">Watermarks</h2>
@@ -737,7 +689,6 @@ const Index = () => {
         </div>
       </div>
 
-      {/* Download Options Dialog */}
       <Dialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen}>
         <DialogContent>
           <DialogHeader>
