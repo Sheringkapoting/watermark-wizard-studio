@@ -5,9 +5,25 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Upload, Image as ImageIcon, Download, Move, Plus } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  Upload, 
+  Image as ImageIcon, 
+  Download, 
+  Move, 
+  Plus, 
+  Settings 
+} from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Position {
   x: number;
@@ -24,17 +40,43 @@ interface Watermark {
   isDragging: boolean;
 }
 
+interface ImageFormat {
+  type: string;
+  quality: number;
+  label: string;
+}
+
 const Index = () => {
   const isMobile = useIsMobile();
   const [sourceImage, setSourceImage] = useState<string | null>(null);
+  const [sourceImageName, setSourceImageName] = useState<string>("image");
+  const [sourceImageType, setSourceImageType] = useState<string>("image/jpeg");
   const [watermarks, setWatermarks] = useState<Watermark[]>([]);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [sourceImageDimensions, setSourceImageDimensions] = useState<{width: number, height: number} | null>(null);
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [downloadFilename, setDownloadFilename] = useState("");
+  const [selectedFormat, setSelectedFormat] = useState<string>("original");
+  const [imageQuality, setImageQuality] = useState<number>(0.9);
   
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const watermarkRefs = useRef<Map<string, HTMLImageElement>>(new Map());
   const startPositionRef = useRef<{ id: string, x: number, y: number, posX: number, posY: number } | null>(null);
+  
+  const imageFormats: ImageFormat[] = [
+    { type: "original", quality: 0.9, label: "Original Format" },
+    { type: "image/jpeg", quality: 0.9, label: "JPEG" },
+    { type: "image/png", quality: 1, label: "PNG" },
+    { type: "image/webp", quality: 0.9, label: "WebP" },
+  ];
+
+  // Reset download filename when source image changes
+  useEffect(() => {
+    if (sourceImageName) {
+      setDownloadFilename(sourceImageName);
+    }
+  }, [sourceImageName]);
   
   // Load source image and get its dimensions
   const loadSourceImage = (src: string) => {
@@ -57,6 +99,11 @@ const Index = () => {
         const imageSrc = e.target?.result as string;
         setSourceImage(imageSrc);
         setResultImage(null);
+        
+        // Store the original filename and type
+        setSourceImageName(file.name.split('.')[0]);
+        setSourceImageType(file.type);
+        setDownloadFilename(file.name.split('.')[0]);
         
         // Load source image dimensions
         await loadSourceImage(imageSrc);
@@ -112,17 +159,6 @@ const Index = () => {
     setResultImage(null);
   };
 
-  // Get watermark dimensions from DOM elements (for the preview)
-  const getWatermarkPreviewDimensions = (watermarkId: string) => {
-    const watermarkElement = watermarkRefs.current.get(watermarkId);
-    if (!watermarkElement) return null;
-    
-    return {
-      width: watermarkElement.naturalWidth,
-      height: watermarkElement.naturalHeight
-    };
-  };
-
   // Process the image with watermarks
   const processImage = useCallback(async () => {
     if (!sourceImage || watermarks.length === 0 || !sourceImageDimensions) {
@@ -156,6 +192,7 @@ const Index = () => {
         throw new Error("Could not get canvas context");
       }
       
+      // Set canvas dimensions to match the source image exactly
       canvas.width = sourceImg.width;
       canvas.height = sourceImg.height;
       
@@ -179,7 +216,6 @@ const Index = () => {
           ctx.globalAlpha = watermark.opacity;
           
           // Calculate watermark size based on the scale relative to the source image
-          // Using the source image's dimensions to determine watermark size
           const watermarkWidth = watermarkImg.width * watermark.scale;
           const watermarkHeight = watermarkImg.height * watermark.scale;
           
@@ -213,8 +249,8 @@ const Index = () => {
       // Wait for all watermarks to be processed
       await Promise.all(watermarkLoadPromises);
       
-      // Convert canvas to data URL
-      const dataURL = canvas.toDataURL('image/png');
+      // Convert canvas to data URL maintaining original format
+      const dataURL = canvas.toDataURL(sourceImageType, 0.9);
       setResultImage(dataURL);
       
       toast({
@@ -231,10 +267,10 @@ const Index = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [sourceImage, watermarks, sourceImageDimensions]);
+  }, [sourceImage, watermarks, sourceImageDimensions, sourceImageType]);
 
-  // Download processed image
-  const downloadImage = () => {
+  // Download processed image in selected format
+  const handleDownload = () => {
     if (!resultImage) {
       toast({
         title: "No Image to Download",
@@ -244,17 +280,76 @@ const Index = () => {
       return;
     }
 
-    const link = document.createElement('a');
-    link.href = resultImage;
-    link.download = 'watermarked-image.png';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    setDownloadDialogOpen(true);
+  };
+
+  // Process download with selected format and filename
+  const processDownload = () => {
+    if (!resultImage) return;
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
     
-    toast({
-      title: "Download Started",
-      description: "Your watermarked image is being downloaded.",
-    });
+    if (!ctx) {
+      toast({
+        title: "Download Error",
+        description: "Could not create canvas context for download.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+      
+      let outputType = sourceImageType;
+      let outputQuality = 0.9;
+      
+      // Use selected format if not "original"
+      if (selectedFormat !== "original") {
+        const format = imageFormats.find(f => f.type === selectedFormat);
+        if (format) {
+          outputType = format.type;
+          outputQuality = imageQuality;
+        }
+      }
+      
+      // Get file extension based on mime type
+      const getExtension = (mimeType: string) => {
+        switch (mimeType) {
+          case 'image/jpeg': return '.jpg';
+          case 'image/png': return '.png';
+          case 'image/webp': return '.webp';
+          default: return '.jpg';
+        }
+      };
+      
+      // Generate download
+      const dataURL = canvas.toDataURL(outputType, outputQuality);
+      const extension = getExtension(outputType);
+      const filename = downloadFilename ? 
+        (downloadFilename.includes('.') ? downloadFilename : downloadFilename + extension) : 
+        'watermarked-image' + extension;
+        
+      const link = document.createElement('a');
+      link.href = dataURL;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setDownloadDialogOpen(false);
+      
+      toast({
+        title: "Download Started",
+        description: "Your watermarked image is being downloaded.",
+      });
+    };
+    
+    img.src = resultImage;
   };
 
   // Drag start handler
@@ -449,6 +544,7 @@ const Index = () => {
                         setSourceImage(null);
                         setResultImage(null);
                         setSourceImageDimensions(null);
+                        setWatermarks([]);
                       }}
                     >
                       Change Image
@@ -459,12 +555,12 @@ const Index = () => {
                         onClick={processImage}
                         disabled={watermarks.length === 0 || isProcessing}
                       >
-                        Apply Watermark
+                        {isProcessing ? "Processing..." : "Apply Watermark"}
                       </Button>
                       
                       <Button
                         variant="secondary"
-                        onClick={downloadImage}
+                        onClick={handleDownload}
                         disabled={!resultImage}
                       >
                         <Download className="h-4 w-4 mr-2" />
@@ -485,7 +581,7 @@ const Index = () => {
                   className="w-full h-auto rounded-md mb-4"
                 />
                 <Button 
-                  onClick={downloadImage} 
+                  onClick={handleDownload} 
                   className="w-full"
                 >
                   <Download className="h-4 w-4 mr-2" />
@@ -640,6 +736,71 @@ const Index = () => {
           </div>
         </div>
       </div>
+
+      {/* Download Options Dialog */}
+      <Dialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Download Options</DialogTitle>
+            <DialogDescription>
+              Customize your download settings
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="filename">Filename</Label>
+              <Input
+                id="filename"
+                value={downloadFilename}
+                onChange={(e) => setDownloadFilename(e.target.value)}
+                placeholder="Enter filename"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="format">Image Format</Label>
+              <Select value={selectedFormat} onValueChange={setSelectedFormat}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select format" />
+                </SelectTrigger>
+                <SelectContent>
+                  {imageFormats.map((format) => (
+                    <SelectItem key={format.type} value={format.type}>
+                      {format.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {selectedFormat !== "image/png" && selectedFormat !== "original" && (
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label htmlFor="quality">Quality: {Math.round(imageQuality * 100)}%</Label>
+                </div>
+                <Slider
+                  id="quality"
+                  min={0.1}
+                  max={1}
+                  step={0.05}
+                  value={[imageQuality]}
+                  onValueChange={([value]) => setImageQuality(value)}
+                />
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDownloadDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={processDownload}>
+              Download
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
