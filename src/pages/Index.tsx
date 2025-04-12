@@ -30,19 +30,36 @@ const Index = () => {
   const [watermarks, setWatermarks] = useState<Watermark[]>([]);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [sourceImageDimensions, setSourceImageDimensions] = useState<{width: number, height: number} | null>(null);
   
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const watermarkRefs = useRef<Map<string, HTMLImageElement>>(new Map());
   const startPositionRef = useRef<{ id: string, x: number, y: number, posX: number, posY: number } | null>(null);
   
+  // Load source image and get its dimensions
+  const loadSourceImage = (src: string) => {
+    return new Promise<{width: number, height: number}>((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        setSourceImageDimensions({width: img.width, height: img.height});
+        resolve({width: img.width, height: img.height});
+      };
+      img.src = src;
+    });
+  };
+
   // Handle source image upload
   const handleSourceImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (e) => {
-        setSourceImage(e.target?.result as string);
+      reader.onload = async (e) => {
+        const imageSrc = e.target?.result as string;
+        setSourceImage(imageSrc);
         setResultImage(null);
+        
+        // Load source image dimensions
+        await loadSourceImage(imageSrc);
       };
       reader.readAsDataURL(file);
       toast({
@@ -95,9 +112,20 @@ const Index = () => {
     setResultImage(null);
   };
 
+  // Get watermark dimensions from DOM elements (for the preview)
+  const getWatermarkPreviewDimensions = (watermarkId: string) => {
+    const watermarkElement = watermarkRefs.current.get(watermarkId);
+    if (!watermarkElement) return null;
+    
+    return {
+      width: watermarkElement.naturalWidth,
+      height: watermarkElement.naturalHeight
+    };
+  };
+
   // Process the image with watermarks
   const processImage = useCallback(async () => {
-    if (!sourceImage || watermarks.length === 0) {
+    if (!sourceImage || watermarks.length === 0 || !sourceImageDimensions) {
       toast({
         title: "Missing Images",
         description: watermarks.length === 0 
@@ -134,48 +162,56 @@ const Index = () => {
       // Draw source image
       ctx.drawImage(sourceImg, 0, 0);
       
+      // Store watermark loading promises
+      const watermarkLoadPromises = [];
+      
       // Process each watermark
       for (const watermark of watermarks) {
         const watermarkImg = new Image();
         
-        await new Promise((resolve) => {
-          watermarkImg.onload = resolve;
+        const watermarkLoaded = new Promise<void>((resolve) => {
+          watermarkImg.onload = () => resolve();
           watermarkImg.src = watermark.src;
         });
         
-        // Apply opacity to context
-        ctx.globalAlpha = watermark.opacity;
-        
-        // Calculate watermark size based on scale
-        // Use the source image's dimensions to determine the watermark size
-        const watermarkWidth = watermarkImg.width * watermark.scale;
-        const watermarkHeight = watermarkImg.height * watermark.scale;
-        
-        // Calculate position (center is default)
-        const posX = (canvas.width - watermarkWidth) * watermark.position.x;
-        const posY = (canvas.height - watermarkHeight) * watermark.position.y;
-        
-        // Save context state
-        ctx.save();
-        
-        // Move to the center of where we want to draw the watermark
-        ctx.translate(posX + (watermarkWidth / 2), posY + (watermarkHeight / 2));
-        
-        // Rotate around that point
-        ctx.rotate((watermark.rotation * Math.PI) / 180);
-        
-        // Draw the watermark with its center at the origin (adjusted for the rotation)
-        ctx.drawImage(
-          watermarkImg,
-          -watermarkWidth / 2,
-          -watermarkHeight / 2,
-          watermarkWidth,
-          watermarkHeight
-        );
-        
-        // Restore context state
-        ctx.restore();
+        watermarkLoadPromises.push(watermarkLoaded.then(() => {
+          // Apply opacity to context
+          ctx.globalAlpha = watermark.opacity;
+          
+          // Calculate watermark size based on the scale relative to the source image
+          // Using the source image's dimensions to determine watermark size
+          const watermarkWidth = watermarkImg.width * watermark.scale;
+          const watermarkHeight = watermarkImg.height * watermark.scale;
+          
+          // Calculate absolute position based on the relative position
+          const posX = (canvas.width - watermarkWidth) * watermark.position.x;
+          const posY = (canvas.height - watermarkHeight) * watermark.position.y;
+          
+          // Save context state
+          ctx.save();
+          
+          // Move to the center point for rotation
+          ctx.translate(posX + (watermarkWidth / 2), posY + (watermarkHeight / 2));
+          
+          // Apply rotation
+          ctx.rotate((watermark.rotation * Math.PI) / 180);
+          
+          // Draw watermark centered at the rotation point
+          ctx.drawImage(
+            watermarkImg,
+            -watermarkWidth / 2,
+            -watermarkHeight / 2,
+            watermarkWidth,
+            watermarkHeight
+          );
+          
+          // Restore context state
+          ctx.restore();
+        }));
       }
+      
+      // Wait for all watermarks to be processed
+      await Promise.all(watermarkLoadPromises);
       
       // Convert canvas to data URL
       const dataURL = canvas.toDataURL('image/png');
@@ -195,7 +231,7 @@ const Index = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [sourceImage, watermarks]);
+  }, [sourceImage, watermarks, sourceImageDimensions]);
 
   // Download processed image
   const downloadImage = () => {
@@ -412,6 +448,7 @@ const Index = () => {
                       onClick={() => {
                         setSourceImage(null);
                         setResultImage(null);
+                        setSourceImageDimensions(null);
                       }}
                     >
                       Change Image
