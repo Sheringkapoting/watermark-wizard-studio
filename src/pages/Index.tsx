@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -196,20 +197,28 @@ const Index = () => {
         });
         
         watermarkLoadPromises.push(watermarkLoaded.then(() => {
+          // Use the same opacity as in the preview
           ctx.globalAlpha = watermark.opacity;
           
+          // Calculate the scaled dimensions using the same formula as in the preview
           const scaledWidth = watermarkImg.width * watermark.scale;
           const scaledHeight = watermarkImg.height * watermark.scale;
           
+          // Calculate position using the same relative positioning formula as in the preview
           const posX = (canvas.width - scaledWidth) * watermark.position.x;
           const posY = (canvas.height - scaledHeight) * watermark.position.y;
           
           ctx.save();
           
+          // Apply the same transformation as in the preview
+          // Translate to the position point plus half the watermark dimensions
           ctx.translate(posX + (scaledWidth / 2), posY + (scaledHeight / 2));
           
+          // Apply the same rotation as in the preview
           ctx.rotate((watermark.rotation * Math.PI) / 180);
           
+          // Draw the watermark centered at the rotation point, with the same
+          // size as shown in the preview
           ctx.drawImage(
             watermarkImg,
             -scaledWidth / 2,
@@ -224,6 +233,7 @@ const Index = () => {
       
       await Promise.all(watermarkLoadPromises);
       
+      // Use the source image type for consistency
       const dataURL = canvas.toDataURL(sourceImageType, 0.9);
       setResultImage(dataURL);
       
