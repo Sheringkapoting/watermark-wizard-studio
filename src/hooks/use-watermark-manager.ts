@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { Watermark, SourceImage, Position, TextWatermark, ImageWatermark } from '@/types/watermark';
 import { toast } from '@/hooks/use-toast';
@@ -13,7 +12,6 @@ export const useWatermarkManager = () => {
     return sourceImages[currentImageIndex] || null;
   }, [sourceImages, currentImageIndex]);
 
-  // Handle source image upload
   const addSourceImages = useCallback((files: FileList) => {
     const newImages: SourceImage[] = [];
     
@@ -44,7 +42,6 @@ export const useWatermarkManager = () => {
     });
   }, [sourceImages]);
 
-  // Add watermark image
   const addImageWatermark = useCallback((file: File) => {
     if (sourceImages.length === 0) {
       toast({
@@ -82,7 +79,6 @@ export const useWatermarkManager = () => {
     reader.readAsDataURL(file);
   }, [sourceImages, currentImageIndex]);
 
-  // Add text watermark
   const addTextWatermark = useCallback((text: string) => {
     if (sourceImages.length === 0) {
       toast({
@@ -129,7 +125,6 @@ export const useWatermarkManager = () => {
     });
   }, [sourceImages, currentImageIndex]);
 
-  // Update watermark properties
   const updateWatermark = useCallback((imageId: string, watermarkId: string, updates: Partial<Watermark>) => {
     setSourceImages(prev => {
       return prev.map(img => {
@@ -146,7 +141,6 @@ export const useWatermarkManager = () => {
     });
   }, []);
 
-  // Remove a watermark
   const removeWatermark = useCallback((imageId: string, watermarkId: string) => {
     setSourceImages(prev => {
       return prev.map(img => {
@@ -166,7 +160,6 @@ export const useWatermarkManager = () => {
     });
   }, []);
 
-  // Remove a source image
   const removeSourceImage = useCallback((imageId: string) => {
     setSourceImages(prev => {
       const newImages = prev.filter(img => img.id !== imageId);
@@ -184,7 +177,6 @@ export const useWatermarkManager = () => {
     });
   }, [currentImageIndex]);
 
-  // Apply watermarks from one image to all images
   const applyWatermarksToAll = useCallback((sourceImageId: string) => {
     const sourceImage = sourceImages.find(img => img.id === sourceImageId);
     if (!sourceImage) return;
@@ -192,8 +184,14 @@ export const useWatermarkManager = () => {
     setSourceImages(prev => {
       return prev.map(img => {
         if (img.id !== sourceImageId) {
-          // Create deep copy and ensure proper typing
-          const watermarksCopy = JSON.parse(JSON.stringify(sourceImage.watermarks)) as Watermark[];
+          // Create deep copy with proper type handling
+          const watermarksCopy: Watermark[] = JSON.parse(JSON.stringify(sourceImage.watermarks)).map((wm: any) => {
+            if (wm.type === 'image') {
+              return wm as ImageWatermark;
+            } else {
+              return wm as TextWatermark;
+            }
+          });
           
           return {
             ...img,
@@ -210,7 +208,6 @@ export const useWatermarkManager = () => {
     });
   }, [sourceImages]);
 
-  // Process all images with their watermarks
   const processAllImages = useCallback(async () => {
     if (sourceImages.length === 0) {
       toast({
@@ -346,7 +343,6 @@ export const useWatermarkManager = () => {
     }
   }, [sourceImages]);
 
-  // Download a processed image
   const downloadImage = useCallback((imageId: string) => {
     const image = sourceImages.find(img => img.id === imageId);
     if (!image || !image.resultSrc) {
@@ -371,7 +367,6 @@ export const useWatermarkManager = () => {
     });
   }, [sourceImages]);
 
-  // Download all processed images as a zip
   const downloadAllImages = useCallback(() => {
     const processedImages = sourceImages.filter(img => img.resultSrc);
     if (processedImages.length === 0) {
