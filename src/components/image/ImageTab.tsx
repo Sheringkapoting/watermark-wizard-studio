@@ -1,4 +1,3 @@
-
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
@@ -107,6 +106,7 @@ export const ImageTab = () => {
 
     setIsProcessing(true);
     try {
+      // Create canvas with the source image
       const sourceImg = new Image();
       
       const sourceLoaded = new Promise((resolve) => {
@@ -128,27 +128,69 @@ export const ImageTab = () => {
       
       ctx.drawImage(sourceImg, 0, 0);
       
+      // Load and draw each watermark
       const watermarkLoadPromises = watermarks.map(watermark => {
         return new Promise<void>((resolve) => {
           const watermarkImg = new Image();
           
           watermarkImg.onload = () => {
-            ctx.globalAlpha = watermark.opacity;
+            // Create a temporary canvas for the watermark to handle rotation properly
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            if (!tempCtx) {
+              resolve();
+              return;
+            }
+            
+            // Calculate dimensions based on the watermark's natural size
+            const maxSize = Math.max(watermarkImg.width, watermarkImg.height);
+            const scaledMaxSize = maxSize * watermark.scale;
+            
+            // Make the temp canvas big enough to hold the rotated watermark
+            tempCanvas.width = scaledMaxSize * 2;
+            tempCanvas.height = scaledMaxSize * 2;
+            
+            // Position at the center of the temp canvas
+            const tempCenterX = tempCanvas.width / 2;
+            const tempCenterY = tempCanvas.height / 2;
+            
+            // Draw the watermark on the temp canvas with rotation
+            tempCtx.save();
+            tempCtx.translate(tempCenterX, tempCenterY);
+            tempCtx.rotate((watermark.rotation * Math.PI) / 180);
+            
+            // Calculate the scaled dimensions while maintaining aspect ratio
             const scaledWidth = watermarkImg.width * watermark.scale;
             const scaledHeight = watermarkImg.height * watermark.scale;
-            const posX = canvas.width * watermark.position.x;
-            const posY = canvas.height * watermark.position.y;
-            ctx.save();
-            ctx.translate(posX, posY);
-            ctx.rotate((watermark.rotation * Math.PI) / 180);
-            ctx.drawImage(
+            
+            // Draw centered on the temp canvas
+            tempCtx.drawImage(
               watermarkImg,
               -scaledWidth / 2,
               -scaledHeight / 2,
               scaledWidth,
               scaledHeight
             );
-            ctx.restore();
+            tempCtx.restore();
+            
+            // Now draw the temp canvas onto the main canvas at the correct position
+            ctx.globalAlpha = watermark.opacity;
+            
+            // Calculate the position on the main canvas
+            const posX = canvas.width * watermark.position.x;
+            const posY = canvas.height * watermark.position.y;
+            
+            // Draw the temp canvas onto the main canvas
+            ctx.drawImage(
+              tempCanvas,
+              posX - tempCanvas.width / 2,
+              posY - tempCanvas.height / 2
+            );
+            
+            // Reset the global alpha
+            ctx.globalAlpha = 1.0;
+            
             resolve();
           };
           
