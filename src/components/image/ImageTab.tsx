@@ -106,7 +106,22 @@ export const ImageTab = () => {
 
     setIsProcessing(true);
     try {
-      // Create temporary canvases to render and measure watermarks exactly as they appear in preview
+      // First, we need to get the reference size from the preview container
+      const previewContainer = imageContainerRef.current;
+      if (!previewContainer) {
+        throw new Error("Preview container reference not found");
+      }
+      
+      const previewWidth = previewContainer.clientWidth;
+      const previewHeight = previewContainer.clientHeight;
+      
+      // Get the preview scale factor (how much the original image is scaled in the preview)
+      const previewScaleFactor = Math.min(
+        previewWidth / sourceImageDimensions.width,
+        previewHeight / sourceImageDimensions.height
+      );
+      
+      // Load all watermark images
       const watermarkData = await Promise.all(
         watermarks.map(async (watermark) => {
           // Load the watermark image
@@ -117,15 +132,9 @@ export const ImageTab = () => {
             img.src = watermark.src;
           });
           
-          // Get natural dimensions
-          const originalWidth = img.width;
-          const originalHeight = img.height;
-          
           return {
             img,
-            watermark,
-            originalWidth,
-            originalHeight
+            watermark
           };
         })
       );
@@ -150,15 +159,21 @@ export const ImageTab = () => {
       // Draw the source image
       ctx.drawImage(sourceImg, 0, 0);
       
-      // Apply each watermark
-      for (const { img, watermark, originalWidth, originalHeight } of watermarkData) {
+      // Apply each watermark, adjusting for the scale difference between preview and final
+      for (const { img, watermark } of watermarkData) {
         // Calculate position in pixels
         const posX = canvas.width * watermark.position.x;
         const posY = canvas.height * watermark.position.y;
         
-        // Calculate scaled dimensions
-        const scaledWidth = originalWidth * watermark.scale;
-        const scaledHeight = originalHeight * watermark.scale;
+        // IMPORTANT: Adjust the watermark scale to account for the difference 
+        // between preview size and actual image size
+        // This ensures the watermark appears the same size relative to the image
+        // in both preview and final output
+        const adjustedScale = watermark.scale / previewScaleFactor;
+        
+        // Calculate scaled dimensions using the adjusted scale
+        const scaledWidth = img.width * adjustedScale;
+        const scaledHeight = img.height * adjustedScale;
         
         // Set opacity
         ctx.globalAlpha = watermark.opacity;
