@@ -7,19 +7,16 @@ import { Watermark } from "@/types/watermark";
 import { WatermarkItem } from "./WatermarkItem";
 import { ImageUploader } from "./ImageUploader";
 import { toast } from "@/hooks/use-toast";
-import type { SourceImage } from "@/hooks/useImageUploader";
 
 interface WatermarkListProps {
   watermarks: Watermark[];
-  activeImage: SourceImage | null;
-  onWatermarkUpload: (src: string, sourceImageId?: string) => void;
+  onWatermarkUpload: (src: string) => void;
   onWatermarkRemove: (id: string) => void;
   onWatermarkUpdate: (id: string, update: Partial<Watermark>) => void;
 }
 
 export const WatermarkList = ({
   watermarks,
-  activeImage,
   onWatermarkUpload,
   onWatermarkRemove,
   onWatermarkUpdate
@@ -29,7 +26,7 @@ export const WatermarkList = ({
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        onWatermarkUpload(e.target?.result as string, activeImage?.id);
+        onWatermarkUpload(e.target?.result as string);
       };
       reader.readAsDataURL(file);
       toast({
@@ -39,25 +36,20 @@ export const WatermarkList = ({
     }
   };
 
-  // Filter watermarks to only show those for the active image
-  const activeWatermarks = watermarks.filter(
-    w => !w.sourceImageId || w.sourceImageId === activeImage?.id
-  );
-
   return (
     <div>
       <h2 className="text-xl font-semibold mb-4">Watermarks</h2>
       
-      {activeWatermarks.length === 0 ? (
+      {watermarks.length === 0 ? (
         <ImageUploader 
           id="watermark-image-upload-initial"
-          onUpload={(src) => onWatermarkUpload(src, activeImage?.id)}
+          onUpload={(src) => onWatermarkUpload(src)}
           buttonText="Select Watermark"
           description="PNG with transparency works best"
         />
       ) : (
         <div className="space-y-6">
-          {activeWatermarks.map((watermark, index) => (
+          {watermarks.map((watermark, index) => (
             <WatermarkItem
               key={watermark.id}
               watermark={watermark}

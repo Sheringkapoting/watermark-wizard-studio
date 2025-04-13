@@ -184,13 +184,13 @@ export const useImageProcessor = () => {
 
   const processAllImages = useCallback(async (
     sourceImages: SourceImage[], 
-    getWatermarksForImage: (sourceImage: SourceImage) => Watermark[],
+    watermarks: Watermark[], 
     previewContainerRef: React.RefObject<HTMLDivElement>
   ) => {
-    if (sourceImages.length === 0) {
+    if (sourceImages.length === 0 || watermarks.length === 0) {
       toast({
         title: "Missing Images",
-        description: "Please add at least one source image.",
+        description: "Please add at least one source image and one watermark.",
         variant: "destructive",
       });
       return;
@@ -201,32 +201,16 @@ export const useImageProcessor = () => {
       const results: ProcessedImage[] = [];
       
       for (const sourceImage of sourceImages) {
-        // Get watermarks specific to this image
-        const imageWatermarks = getWatermarksForImage(sourceImage);
-        
-        if (imageWatermarks.length === 0) {
-          // Skip images without watermarks
-          continue;
-        }
-        
-        const resultSrc = await processImage(sourceImage, imageWatermarks, previewContainerRef);
+        const resultSrc = await processImage(sourceImage, watermarks, previewContainerRef);
         if (resultSrc) {
           results.push({ sourceId: sourceImage.id, resultSrc });
         }
       }
       
-      if (results.length === 0) {
-        toast({
-          title: "No Images Processed",
-          description: "None of the images had watermarks applied to them.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Batch Processing Complete",
-          description: `Applied watermarks to ${results.length} of ${sourceImages.length} images.`,
-        });
-      }
+      toast({
+        title: "Batch Processing Complete",
+        description: `Applied watermarks to ${results.length} of ${sourceImages.length} images.`,
+      });
     } catch (error) {
       console.error('Error processing images:', error);
       toast({

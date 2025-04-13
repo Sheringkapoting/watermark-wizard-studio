@@ -5,7 +5,7 @@ import { Watermark } from "@/types/watermark";
 export const useWatermarkManager = () => {
   const [watermarks, setWatermarks] = useState<Watermark[]>([]);
 
-  const addWatermark = (src: string, sourceImageId?: string) => {
+  const addWatermark = (src: string) => {
     const newWatermark: Watermark = {
       id: `watermark-${Date.now()}`,
       src: src,
@@ -13,8 +13,7 @@ export const useWatermarkManager = () => {
       scale: 0.5,
       position: { x: 0.5, y: 0.5 },
       rotation: 0,
-      isDragging: false,
-      sourceImageId // Associate with a specific source image if provided
+      isDragging: false
     };
     
     setWatermarks(prevWatermarks => [...prevWatermarks, newWatermark]);
@@ -40,32 +39,11 @@ export const useWatermarkManager = () => {
     );
   };
 
-  // Get watermarks associated with a specific source image or all watermarks if sourceImageId is not provided
-  const getWatermarksForImage = (sourceImageId?: string) => {
-    if (!sourceImageId) return watermarks;
-    return watermarks.filter(watermark => !watermark.sourceImageId || watermark.sourceImageId === sourceImageId);
-  };
-
-  // Clone watermarks from one image to another
-  const cloneWatermarksToImage = (fromImageId: string, toImageId: string) => {
-    const sourceWatermarks = watermarks.filter(w => w.sourceImageId === fromImageId);
-    
-    const newWatermarks = sourceWatermarks.map(watermark => ({
-      ...watermark,
-      id: `watermark-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      sourceImageId: toImageId
-    }));
-    
-    setWatermarks(prev => [...prev, ...newWatermarks]);
-  };
-
   return {
     watermarks,
     addWatermark,
     removeWatermark,
     updateWatermark,
-    updateDraggingState,
-    getWatermarksForImage,
-    cloneWatermarksToImage
+    updateDraggingState
   };
 };

@@ -1,5 +1,6 @@
+
 import { useRef, useCallback, RefObject } from "react";
-import { Watermark, Position, constrainPosition } from "@/types/watermark";
+import { Watermark, Position } from "@/types/watermark";
 
 interface DragPosition {
   id: string;
@@ -72,8 +73,6 @@ export const useDragManager = (
     let newPosX = startPositionRef.current.posX + deltaX;
     let newPosY = startPositionRef.current.posY + deltaY;
     
-    // Apply constraints to keep watermark inside the image
-    // We're already doing Math.max(0, Math.min(1, value)) here
     newPosX = Math.max(0, Math.min(1, newPosX));
     newPosY = Math.max(0, Math.min(1, newPosY));
     
