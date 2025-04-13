@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Watermark } from "@/types/watermark";
 
@@ -8,6 +7,9 @@ interface WatermarkImageProps {
 }
 
 export const WatermarkImage = ({ watermark, onDragStart }: WatermarkImageProps) => {
+  // Calculate boundaries to keep watermark inside the image
+  // The position is constrained between 0 and 1 already in the dragManager
+  
   return (
     <img
       src={watermark.src}

@@ -38,6 +38,11 @@ export const ImageEditor = ({
   imageContainerRef
 }: ImageEditorProps) => {
   const activeImage = sourceImages[activeImageIndex];
+  
+  // Filter watermarks to only show those for the active image
+  const activeWatermarks = watermarks.filter(
+    w => !w.sourceImageId || w.sourceImageId === activeImage?.id
+  );
 
   return (
     <div className="w-full relative">
@@ -50,7 +55,7 @@ export const ImageEditor = ({
           />
         )}
         
-        {watermarks.map((watermark) => (
+        {activeWatermarks.map((watermark) => (
           <WatermarkImage
             key={watermark.id}
             watermark={watermark}
@@ -77,7 +82,7 @@ export const ImageEditor = ({
         <div className="flex gap-2">
           <Button
             onClick={onProcessImage}
-            disabled={watermarks.length === 0 || isProcessing || sourceImages.length === 0}
+            disabled={activeWatermarks.length === 0 || isProcessing || sourceImages.length === 0}
           >
             {isProcessing ? "Processing..." : "Apply Watermark"}
           </Button>
@@ -86,7 +91,7 @@ export const ImageEditor = ({
             <Button
               variant="default"
               onClick={onProcessAllImages}
-              disabled={watermarks.length === 0 || isProcessing || sourceImages.length === 0}
+              disabled={activeWatermarks.length === 0 || isProcessing || sourceImages.length === 0}
             >
               Apply to All Images
             </Button>

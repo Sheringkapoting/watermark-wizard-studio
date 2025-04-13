@@ -35,7 +35,8 @@ export const ImageTab = () => {
     addWatermark,
     removeWatermark,
     updateWatermark,
-    updateDraggingState
+    updateDraggingState,
+    getWatermarksForImage
   } = useWatermarkManager();
   
   const {
@@ -100,26 +101,29 @@ export const ImageTab = () => {
 
   // Handle watermark image upload
   const handleWatermarkImageUpload = (src: string) => {
-    addWatermark(src);
+    const activeImage = getActiveImage();
+    addWatermark(src, activeImage?.id);
   };
 
   // Process the active image with watermarks
   const handleProcessImage = () => {
     const activeImage = getActiveImage();
     if (activeImage) {
+      // Use only watermarks associated with this image
+      const imageWatermarks = getWatermarksForImage(activeImage.id);
       processImage(
         activeImage, 
-        watermarks, 
+        imageWatermarks, 
         imageContainerRef
       );
     }
   };
 
-  // Process all images with the same watermarks
+  // Process all images with their respective watermarks
   const handleProcessAllImages = () => {
     processAllImages(
       sourceImages,
-      watermarks,
+      (sourceImage) => getWatermarksForImage(sourceImage.id),
       imageContainerRef
     );
   };
@@ -135,6 +139,8 @@ export const ImageTab = () => {
     const resultImage = getResultImage();
     processDownload(resultImage);
   };
+
+  const activeImage = getActiveImage();
 
   return (
     <div className={`grid ${isMobile ? 'grid-cols-1 gap-6' : 'grid-cols-[1fr_380px] gap-8'}`}>
@@ -191,6 +197,7 @@ export const ImageTab = () => {
         <Card className="p-6">
           <WatermarkList 
             watermarks={watermarks}
+            activeImage={activeImage}
             onWatermarkUpload={handleWatermarkImageUpload}
             onWatermarkRemove={removeWatermark}
             onWatermarkUpdate={updateWatermark}
