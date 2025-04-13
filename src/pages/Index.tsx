@@ -1,5 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React from "react";
 import { Card } from "@/components/ui/card";
+import { Plus } from "lucide-react";
+import { TabsContainer } from "@/components/TabsContainer";
+import { VideoTab } from "@/components/video/VideoTab";
+
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ImageFormat, Watermark } from "@/types/watermark";
-import { Plus } from "lucide-react";
 
 import { ImageUploader } from "@/components/watermark/ImageUploader";
 import { WatermarkImage } from "@/components/watermark/WatermarkImage";
@@ -17,6 +21,7 @@ import { ImageEditor } from "@/components/watermark/ImageEditor";
 import { ResultPreview } from "@/components/watermark/ResultPreview";
 import { Instructions } from "@/components/watermark/Instructions";
 import { DownloadDialog } from "@/components/watermark/DownloadDialog";
+import { WatermarkList } from "@/components/watermark/WatermarkList";
 
 const Index = () => {
   const isMobile = useIsMobile();
@@ -376,133 +381,72 @@ const Index = () => {
     };
   }, [watermarks, handleDrag, handleDragEnd]);
 
-  const WatermarkList = ({
-    watermarks,
-    onWatermarkUpload,
-    onWatermarkRemove,
-    onWatermarkUpdate
-  }: {
-    watermarks: Watermark[];
-    onWatermarkUpload: (src: string) => void;
-    onWatermarkRemove: (id: string) => void;
-    onWatermarkUpdate: (id: string, update: Partial<Watermark>) => void;
-  }) => {
-    const handleWatermarkImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          onWatermarkUpload(e.target?.result as string);
-        };
-        reader.readAsDataURL(file);
-        toast({
-          title: "Watermark Uploaded",
-          description: "Watermark image has been added successfully.",
-        });
-      }
-    };
-
+  const renderImageTab = () => {
     return (
-      <div>
-        <h2 className="text-xl font-semibold mb-4">Watermarks</h2>
+      <div className={`grid ${isMobile ? 'grid-cols-1 gap-6' : 'grid-cols-[1fr_380px] gap-8'}`}>
+        <div className="flex flex-col gap-4">
+          <Card className="p-6 flex flex-col items-center justify-center">
+            {!sourceImage ? (
+              <ImageUploader 
+                id="source-image-upload"
+                onUpload={handleSourceImageUpload}
+                buttonText="Select Image"
+                description="Upload an image to add a watermark"
+              />
+            ) : (
+              <ImageEditor 
+                sourceImage={sourceImage}
+                watermarks={watermarks}
+                onDragStart={handleDragStart}
+                onChangeImage={resetAll}
+                onProcessImage={processImage}
+                onDownload={handleDownload}
+                resultImage={resultImage}
+                isProcessing={isProcessing}
+                imageContainerRef={imageContainerRef}
+              />
+            )}
+          </Card>
+          
+          {resultImage && (
+            <Card className="p-6">
+              <ResultPreview 
+                resultImage={resultImage} 
+                onDownload={handleDownload} 
+              />
+            </Card>
+          )}
+        </div>
         
-        {watermarks.length === 0 ? (
-          <ImageUploader 
-            id="watermark-image-upload-initial"
-            onUpload={(src) => onWatermarkUpload(src)}
-            buttonText="Select Watermark"
-            description="PNG with transparency works best"
-          />
-        ) : (
-          <div className="space-y-6">
-            {watermarks.map((watermark, index) => (
-              <WatermarkItem
-                key={watermark.id}
-                watermark={watermark}
-                index={index}
-                onRemove={onWatermarkRemove}
-                onUpdate={onWatermarkUpdate}
-              />
-            ))}
-            
-            <div>
-              <Input
-                id="watermark-image-upload-additional"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleWatermarkImageUpload}
-              />
-              <label htmlFor="watermark-image-upload-additional">
-                <Button asChild variant="outline" className="w-full">
-                  <span>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Another Watermark
-                  </span>
-                </Button>
-              </label>
-            </div>
-          </div>
-        )}
+        <div className="flex flex-col gap-4">
+          <Card className="p-6">
+            <WatermarkList 
+              watermarks={watermarks}
+              onWatermarkUpload={handleWatermarkImageUpload}
+              onWatermarkRemove={removeWatermark}
+              onWatermarkUpdate={updateWatermarkSettings}
+            />
+          </Card>
+          
+          <Card className="p-6">
+            <Instructions />
+          </Card>
+        </div>
       </div>
-    );
+    )
   };
 
   return (
     <div className="min-h-screen w-full bg-gray-50 p-4">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-center mb-8">Watermark Wizard Studio</h1>
+        <h1 className="text-3xl font-bold text-center mb-8">Multimedia Editor Studio</h1>
         
-        <div className={`grid ${isMobile ? 'grid-cols-1 gap-6' : 'grid-cols-[1fr_380px] gap-8'}`}>
-          <div className="flex flex-col gap-4">
-            <Card className="p-6 flex flex-col items-center justify-center">
-              {!sourceImage ? (
-                <ImageUploader 
-                  id="source-image-upload"
-                  onUpload={handleSourceImageUpload}
-                  buttonText="Select Image"
-                  description="Upload an image to add a watermark"
-                />
-              ) : (
-                <ImageEditor 
-                  sourceImage={sourceImage}
-                  watermarks={watermarks}
-                  onDragStart={handleDragStart}
-                  onChangeImage={resetAll}
-                  onProcessImage={processImage}
-                  onDownload={handleDownload}
-                  resultImage={resultImage}
-                  isProcessing={isProcessing}
-                  imageContainerRef={imageContainerRef}
-                />
-              )}
-            </Card>
-            
-            {resultImage && (
-              <Card className="p-6">
-                <ResultPreview 
-                  resultImage={resultImage} 
-                  onDownload={handleDownload} 
-                />
-              </Card>
-            )}
-          </div>
-          
-          <div className="flex flex-col gap-4">
-            <Card className="p-6">
-              <WatermarkList 
-                watermarks={watermarks}
-                onWatermarkUpload={handleWatermarkImageUpload}
-                onWatermarkRemove={removeWatermark}
-                onWatermarkUpdate={updateWatermarkSettings}
-              />
-            </Card>
-            
-            <Card className="p-6">
-              <Instructions />
-            </Card>
-          </div>
-        </div>
+        <TabsContainer
+          children={{
+            images: renderImageTab(),
+            videos: <VideoTab />
+          }}
+        />
       </div>
 
       <DownloadDialog
