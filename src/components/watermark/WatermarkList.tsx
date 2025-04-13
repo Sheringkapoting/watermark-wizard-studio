@@ -22,18 +22,23 @@ export const WatermarkList = ({
   onWatermarkUpdate
 }: WatermarkListProps) => {
   const handleWatermarkImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    Array.from(files).forEach(file => {
       const reader = new FileReader();
       reader.onload = (e) => {
         onWatermarkUpload(e.target?.result as string);
       };
       reader.readAsDataURL(file);
-      toast({
-        title: "Watermark Uploaded",
-        description: "Watermark image has been added successfully.",
-      });
-    }
+    });
+    
+    toast({
+      title: "Watermark Uploaded",
+      description: files.length === 1 
+        ? "Watermark image has been added successfully." 
+        : `${files.length} watermark images have been added successfully.`,
+    });
   };
 
   return (
@@ -64,6 +69,7 @@ export const WatermarkList = ({
               id="watermark-image-upload-additional"
               type="file"
               accept="image/*"
+              multiple
               className="hidden"
               onChange={handleWatermarkImageUpload}
             />

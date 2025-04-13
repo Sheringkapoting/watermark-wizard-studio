@@ -25,6 +25,7 @@ export const ImageTab = () => {
     activeImageIndex,
     getActiveImage,
     handleSourceImageUpload,
+    handleMultipleSourceImagesUpload,
     removeImage,
     setActiveImage,
     resetImages
@@ -144,8 +145,10 @@ export const ImageTab = () => {
             <ImageUploader 
               id="source-image-upload"
               onUpload={handleSourceImageUpload}
-              buttonText="Select Image"
-              description="Upload an image to add a watermark"
+              buttonText="Select Images"
+              description="Upload images to add watermarks"
+              multiple={true}
+              onMultipleUpload={handleMultipleSourceImagesUpload}
             />
           ) : (
             <ImageEditor 
@@ -173,6 +176,8 @@ export const ImageTab = () => {
               onUpload={handleSourceImageUpload}
               buttonText="Add Another Image"
               description="Upload additional images"
+              multiple={true}
+              onMultipleUpload={handleMultipleSourceImagesUpload}
             />
           </div>
         )}

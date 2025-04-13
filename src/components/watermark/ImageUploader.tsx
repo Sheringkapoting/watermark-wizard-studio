@@ -10,17 +10,52 @@ interface ImageUploaderProps {
   onUpload: (imageSrc: string, fileName: string, fileType: string) => void;
   buttonText: string;
   description: string;
+  multiple?: boolean;
+  onMultipleUpload?: (files: { src: string, name: string, type: string }[]) => void;
 }
 
 export const ImageUploader = ({ 
   id, 
   onUpload, 
   buttonText, 
-  description 
+  description,
+  multiple = false,
+  onMultipleUpload
 }: ImageUploaderProps) => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    if (multiple && files.length > 1 && onMultipleUpload) {
+      // Handle multiple files
+      const filePromises: Promise<{ src: string, name: string, type: string }>[] = [];
+      
+      Array.from(files).forEach(file => {
+        const promise = new Promise<{ src: string, name: string, type: string }>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const imageSrc = e.target?.result as string;
+            resolve({
+              src: imageSrc,
+              name: file.name.split('.')[0],
+              type: file.type
+            });
+          };
+          reader.readAsDataURL(file);
+        });
+        filePromises.push(promise);
+      });
+
+      Promise.all(filePromises).then(results => {
+        onMultipleUpload(results);
+        toast({
+          title: "Images Uploaded",
+          description: `${results.length} images have been loaded successfully.`,
+        });
+      });
+    } else {
+      // Handle single file
+      const file = files[0];
       const reader = new FileReader();
       reader.onload = (e) => {
         const imageSrc = e.target?.result as string;
@@ -45,6 +80,7 @@ export const ImageUploader = ({
         id={id}
         type="file"
         accept="image/*"
+        multiple={multiple}
         className="hidden"
         onChange={handleImageUpload}
       />
