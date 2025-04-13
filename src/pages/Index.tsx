@@ -1,5 +1,4 @@
-
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ImageFormat, Watermark } from "@/types/watermark";
+import { Plus } from "lucide-react"; // Add this import
 
 // Import the standalone components instead of defining them inline
 import { ImageUploader } from "@/components/watermark/ImageUploader";
@@ -536,4 +536,3 @@ const Index = () => {
 };
 
 export default Index;
-
