@@ -106,86 +106,86 @@ export const ImageTab = () => {
 
     setIsProcessing(true);
     try {
-      // Load the source image
       const sourceImg = new Image();
-      await new Promise((resolve) => {
+      await new Promise(resolve => {
         sourceImg.onload = resolve;
         sourceImg.src = sourceImage;
       });
       
-      // Create main canvas for the output
-      const mainCanvas = document.createElement('canvas');
-      mainCanvas.width = sourceImg.width;
-      mainCanvas.height = sourceImg.height;
-      const mainCtx = mainCanvas.getContext('2d');
+      const canvas = document.createElement('canvas');
+      canvas.width = sourceImg.width;
+      canvas.height = sourceImg.height;
+      const ctx = canvas.getContext('2d');
       
-      if (!mainCtx) {
-        throw new Error("Could not get main canvas context");
+      if (!ctx) {
+        throw new Error("Could not get canvas context");
       }
       
       // Draw the source image
-      mainCtx.drawImage(sourceImg, 0, 0);
+      ctx.drawImage(sourceImg, 0, 0);
       
       // Process each watermark
       for (const watermark of watermarks) {
         // Load the watermark image
         const watermarkImg = new Image();
-        await new Promise<void>((resolve, reject) => {
-          watermarkImg.onload = () => resolve();
+        await new Promise(resolve => {
+          watermarkImg.onload = resolve;
           watermarkImg.onerror = () => {
             console.error(`Failed to load watermark: ${watermark.id}`);
-            resolve(); // Continue with other watermarks
+            resolve();
           };
           watermarkImg.src = watermark.src;
         });
         
-        try {
-          // Get original dimensions
-          const originalWidth = watermarkImg.width;
-          const originalHeight = watermarkImg.height;
-          
-          // Calculate scaled dimensions (before rotation)
-          const scaledWidth = originalWidth * watermark.scale;
-          const scaledHeight = originalHeight * watermark.scale;
-          
-          // Calculate the absolute position on the main canvas
-          const posX = mainCanvas.width * watermark.position.x;
-          const posY = mainCanvas.height * watermark.position.y;
-          
-          // Set opacity
-          mainCtx.globalAlpha = watermark.opacity;
-          
-          // Save current context state
-          mainCtx.save();
-          
-          // Move to the position where we want the center of the watermark to be
-          mainCtx.translate(posX, posY);
-          
-          // Apply rotation around this center point
-          mainCtx.rotate((watermark.rotation * Math.PI) / 180);
-          
-          // Draw the watermark centered at the origin (which we've translated to the desired position)
-          // This matches the CSS transform with translate(-50%, -50%)
-          mainCtx.drawImage(
-            watermarkImg,
-            -scaledWidth / 2,
-            -scaledHeight / 2,
-            scaledWidth,
-            scaledHeight
-          );
-          
-          // Restore context to previous state
-          mainCtx.restore();
-          
-          // Reset global alpha for next operations
-          mainCtx.globalAlpha = 1.0;
-        } catch (err) {
-          console.error('Error processing watermark:', err);
-        }
+        // Get the original dimensions
+        const origWidth = watermarkImg.width;
+        const origHeight = watermarkImg.height;
+        
+        // Get the scaled dimensions
+        const scaledWidth = origWidth * watermark.scale;
+        const scaledHeight = origHeight * watermark.scale;
+        
+        // Calculate position in pixels
+        const posX = canvas.width * watermark.position.x;
+        const posY = canvas.height * watermark.position.y;
+        
+        // Set opacity
+        ctx.globalAlpha = watermark.opacity;
+        
+        // Save the context state
+        ctx.save();
+        
+        // Apply transformations IN REVERSE ORDER compared to CSS
+        // CSS: translate(-50%, -50%) scale(n) rotate(deg)
+        // Canvas needs: translate -> rotate -> scale -> draw with offset
+        
+        // 1. Translate to the position
+        ctx.translate(posX, posY);
+        
+        // 2. Rotate
+        ctx.rotate(watermark.rotation * Math.PI / 180);
+        
+        // 3. Scale - Note: for canvas we scale the context
+        ctx.scale(watermark.scale, watermark.scale);
+        
+        // 4. Draw the image with the centering offset (equivalent to translate(-50%, -50%))
+        ctx.drawImage(
+          watermarkImg,
+          -origWidth / 2,  // We use original width since we scaled the context
+          -origHeight / 2, // We use original height since we scaled the context
+          origWidth,       // We use original dimensions since we scaled the context
+          origHeight       
+        );
+        
+        // Restore the context to its original state
+        ctx.restore();
       }
       
-      // Generate the final image
-      const dataURL = mainCanvas.toDataURL(sourceImageType, 0.9);
+      // Reset opacity
+      ctx.globalAlpha = 1;
+      
+      // Create the final image
+      const dataURL = canvas.toDataURL(sourceImageType, 0.9);
       setResultImage(dataURL);
       
       toast({
