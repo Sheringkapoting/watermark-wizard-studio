@@ -36,16 +36,13 @@ export const ImageEditor = ({
           className="w-full h-auto rounded-md object-contain max-h-[70vh]"
         />
         
-        {/* Watermark container to ensure consistent positioning */}
-        <div className="absolute inset-0 pointer-events-none">
-          {watermarks.map((watermark) => (
-            <WatermarkImage
-              key={watermark.id}
-              watermark={watermark}
-              onDragStart={onDragStart}
-            />
-          ))}
-        </div>
+        {watermarks.map((watermark) => (
+          <WatermarkImage
+            key={watermark.id}
+            watermark={watermark}
+            onDragStart={onDragStart}
+          />
+        ))}
       </div>
 
       <div className="flex justify-between mt-4">
