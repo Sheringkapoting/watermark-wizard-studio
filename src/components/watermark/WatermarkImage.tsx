@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Watermark } from "@/types/watermark";
 
@@ -25,6 +26,8 @@ export const WatermarkImage = ({ watermark, onDragStart }: WatermarkImageProps) 
         boxShadow: watermark.isDragging ? "0 0 0 2px rgba(59, 130, 246, 0.5)" : "none",
         transition: "box-shadow 0.2s ease"
       }}
+      data-position-x={watermark.position.x}
+      data-position-y={watermark.position.y}
       onMouseDown={(e) => onDragStart(watermark.id, e)}
       onTouchStart={(e) => onDragStart(watermark.id, e)}
       draggable="false" // Prevent default dragging behavior
