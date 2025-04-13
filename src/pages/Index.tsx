@@ -100,107 +100,118 @@ const Index = () => {
     setResultImage(null);
   };
 
-  const processImage = useCallback(async () => {
-    if (!sourceImage || watermarks.length === 0 || !sourceImageDimensions) {
-      toast({
-        title: "Missing Images",
-        description: watermarks.length === 0 
-          ? "Please add at least one watermark." 
-          : "Please upload both source image and at least one watermark.",
-        variant: "destructive",
-      });
-      return;
-    }
+// Fixed processImage function to ensure consistent watermark rendering
+const processImage = useCallback(async () => {
+  if (!sourceImage || watermarks.length === 0 || !sourceImageDimensions) {
+    toast({
+      title: "Missing Images",
+      description: watermarks.length === 0 
+        ? "Please add at least one watermark." 
+        : "Please upload both source image and at least one watermark.",
+      variant: "destructive",
+    });
+    return;
+  }
 
-    setIsProcessing(true);
-    try {
-      const sourceImg = new Image();
-      
-      const sourceLoaded = new Promise((resolve) => {
-        sourceImg.onload = resolve;
-        sourceImg.src = sourceImage;
-      });
-      
-      await sourceLoaded;
-      
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) {
-        throw new Error("Could not get canvas context");
-      }
-      
-      canvas.width = sourceImg.width;
-      canvas.height = sourceImg.height;
-      
-      ctx.drawImage(sourceImg, 0, 0);
-      
-      const watermarkLoadPromises = [];
-      
-      for (const watermark of watermarks) {
+  setIsProcessing(true);
+  try {
+    const sourceImg = new Image();
+    
+    const sourceLoaded = new Promise((resolve) => {
+      sourceImg.onload = resolve;
+      sourceImg.src = sourceImage;
+    });
+    
+    await sourceLoaded;
+    
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) {
+      throw new Error("Could not get canvas context");
+    }
+    
+    // Set canvas dimensions to match the source image
+    canvas.width = sourceImg.width;
+    canvas.height = sourceImg.height;
+    
+    // Draw the source image
+    ctx.drawImage(sourceImg, 0, 0);
+    
+    // Create an array to hold the loading promises for all watermarks
+    const watermarkLoadPromises = watermarks.map(watermark => {
+      return new Promise<void>((resolve) => {
         const watermarkImg = new Image();
         
-        const watermarkLoaded = new Promise<void>((resolve) => {
-          watermarkImg.onload = () => resolve();
-          watermarkImg.src = watermark.src;
-        });
-        
-        watermarkLoadPromises.push(watermarkLoaded.then(() => {
-          // Use the same opacity as in the preview
+        watermarkImg.onload = () => {
+          // Set the global alpha (opacity) for this watermark
           ctx.globalAlpha = watermark.opacity;
           
-          // Calculate the scaled dimensions using the same formula as in the preview
+          // Calculate the scaled dimensions based on the original watermark size
+          // and the user-specified scale factor
           const scaledWidth = watermarkImg.width * watermark.scale;
           const scaledHeight = watermarkImg.height * watermark.scale;
           
-          // Calculate position using the same relative positioning formula as in the preview
+          // Calculate the absolute position in pixels based on the relative position (0-1)
+          // This ensures positioning is consistent between preview and final output
           const posX = canvas.width * watermark.position.x;
           const posY = canvas.height * watermark.position.y;
           
+          // Save the current canvas state
           ctx.save();
           
-          // Apply the same transformation as in the preview
-          // Translate to the position point
+          // Move to the position where we want to center the watermark
           ctx.translate(posX, posY);
           
-          // Apply the same rotation as in the preview
+          // Apply rotation around this center point
           ctx.rotate((watermark.rotation * Math.PI) / 180);
           
-          // Draw the watermark centered at the rotation point, with the same
-          // size as shown in the preview
+          // Draw the watermark centered at the rotation point
           ctx.drawImage(
             watermarkImg,
-            -scaledWidth / 2,
-            -scaledHeight / 2,
+            -scaledWidth / 2,  // Offset X to center the watermark
+            -scaledHeight / 2, // Offset Y to center the watermark
             scaledWidth,
             scaledHeight
           );
           
+          // Restore the canvas state
           ctx.restore();
-        }));
-      }
-      
-      await Promise.all(watermarkLoadPromises);
-      
-      // Use the source image type for consistency
-      const dataURL = canvas.toDataURL(sourceImageType, 0.9);
-      setResultImage(dataURL);
-      
-      toast({
-        title: "Processing Complete",
-        description: "Watermarks have been applied successfully.",
+          
+          resolve();
+        };
+        
+        watermarkImg.onerror = () => {
+          console.error(`Failed to load watermark image: ${watermark.id}`);
+          resolve(); // Resolve anyway to prevent hanging
+        };
+        
+        watermarkImg.src = watermark.src;
       });
-    } catch (error) {
-      console.error('Error processing image:', error);
-      toast({
-        title: "Processing Error",
-        description: "An error occurred while processing the image.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [sourceImage, watermarks, sourceImageDimensions, sourceImageType]);
+    });
+    
+    // Wait for all watermark images to be loaded and drawn
+    await Promise.all(watermarkLoadPromises);
+    
+    // Convert canvas to data URL using the source image type for consistency
+    const dataURL = canvas.toDataURL(sourceImageType, 0.9);
+    setResultImage(dataURL);
+    
+    toast({
+      title: "Processing Complete",
+      description: "Watermarks have been applied successfully.",
+    });
+  } catch (error) {
+    console.error('Error processing image:', error);
+    toast({
+      title: "Processing Error",
+      description: "An error occurred while processing the image.",
+      variant: "destructive",
+    });
+  } finally {
+    setIsProcessing(false);
+  }
+}, [sourceImage, watermarks, sourceImageDimensions, sourceImageType]);
 
   const handleDownload = () => {
     if (!resultImage) {
