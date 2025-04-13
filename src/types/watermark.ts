@@ -19,3 +19,14 @@ export interface ImageFormat {
   quality: number;
   label: string;
 }
+
+// For debugging position issues
+export const debugPosition = (
+  position: Position, 
+  container: HTMLElement | null
+): string => {
+  if (!container) return JSON.stringify(position);
+  const width = container.clientWidth;
+  const height = container.clientHeight;
+  return `x: ${Math.round(position.x * width)}px, y: ${Math.round(position.y * height)}px`;
+};

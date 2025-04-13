@@ -1,5 +1,5 @@
 
-import React, { useRef } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Watermark } from "@/types/watermark";
 import { WatermarkImage } from "./WatermarkImage";
@@ -13,6 +13,7 @@ interface ImageEditorProps {
   onDownload: () => void;
   resultImage: string | null;
   isProcessing: boolean;
+  imageContainerRef?: React.RefObject<HTMLDivElement>;
 }
 
 export const ImageEditor = ({
@@ -23,10 +24,9 @@ export const ImageEditor = ({
   onProcessImage,
   onDownload,
   resultImage,
-  isProcessing
+  isProcessing,
+  imageContainerRef
 }: ImageEditorProps) => {
-  const imageContainerRef = useRef<HTMLDivElement>(null);
-
   return (
     <div className="w-full relative">
       <div className="relative" ref={imageContainerRef}>
