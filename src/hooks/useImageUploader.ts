@@ -1,17 +1,26 @@
 
 import { useState } from "react";
 
+export interface SourceImage {
+  id: string;
+  src: string;
+  name: string;
+  type: string;
+  dimensions: { width: number; height: number } | null;
+}
+
 export const useImageUploader = () => {
-  const [sourceImage, setSourceImage] = useState<string | null>(null);
-  const [sourceImageName, setSourceImageName] = useState<string>("image");
-  const [sourceImageType, setSourceImageType] = useState<string>("image/jpeg");
-  const [sourceImageDimensions, setSourceImageDimensions] = useState<{width: number, height: number} | null>(null);
+  const [sourceImages, setSourceImages] = useState<SourceImage[]>([]);
+  const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
+
+  const getActiveImage = (): SourceImage | null => {
+    return sourceImages.length > 0 ? sourceImages[activeImageIndex] : null;
+  };
 
   const loadSourceImage = (src: string) => {
     return new Promise<{width: number, height: number}>((resolve) => {
       const img = new Image();
       img.onload = () => {
-        setSourceImageDimensions({width: img.width, height: img.height});
         resolve({width: img.width, height: img.height});
       };
       img.src = src;
@@ -19,25 +28,52 @@ export const useImageUploader = () => {
   };
 
   const handleSourceImageUpload = async (imageSrc: string, fileName: string, fileType: string) => {
-    setSourceImage(imageSrc);
+    const dimensions = await loadSourceImage(imageSrc);
     
-    setSourceImageName(fileName);
-    setSourceImageType(fileType);
+    const newImage: SourceImage = {
+      id: `image-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      src: imageSrc,
+      name: fileName,
+      type: fileType,
+      dimensions
+    };
     
-    await loadSourceImage(imageSrc);
+    setSourceImages(prev => [...prev, newImage]);
+    setActiveImageIndex(sourceImages.length); // Set the newly added image as active
   };
 
-  const resetImage = () => {
-    setSourceImage(null);
-    setSourceImageDimensions(null);
+  const removeImage = (id: string) => {
+    const indexToRemove = sourceImages.findIndex(img => img.id === id);
+    if (indexToRemove === -1) return;
+    
+    setSourceImages(prev => prev.filter((_, index) => index !== indexToRemove));
+    
+    // Adjust active index if necessary
+    if (activeImageIndex >= sourceImages.length - 1) {
+      setActiveImageIndex(Math.max(0, sourceImages.length - 2));
+    } else if (activeImageIndex === indexToRemove) {
+      setActiveImageIndex(Math.max(0, activeImageIndex - 1));
+    }
+  };
+
+  const setActiveImage = (index: number) => {
+    if (index >= 0 && index < sourceImages.length) {
+      setActiveImageIndex(index);
+    }
+  };
+
+  const resetImages = () => {
+    setSourceImages([]);
+    setActiveImageIndex(0);
   };
 
   return {
-    sourceImage,
-    sourceImageName,
-    sourceImageType,
-    sourceImageDimensions,
+    sourceImages,
+    activeImageIndex,
+    getActiveImage,
     handleSourceImageUpload,
-    resetImage
+    removeImage,
+    setActiveImage,
+    resetImages
   };
 };

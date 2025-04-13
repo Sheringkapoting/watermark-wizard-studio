@@ -21,12 +21,13 @@ export const ImageTab = () => {
   
   // Custom hooks
   const {
-    sourceImage,
-    sourceImageName,
-    sourceImageType,
-    sourceImageDimensions,
+    sourceImages,
+    activeImageIndex,
+    getActiveImage,
     handleSourceImageUpload,
-    resetImage
+    removeImage,
+    setActiveImage,
+    resetImages
   } = useImageUploader();
   
   const {
@@ -38,10 +39,13 @@ export const ImageTab = () => {
   } = useWatermarkManager();
   
   const {
-    resultImage,
-    setResultImage,
+    processedImages,
+    activeResultIndex,
+    getResultImage,
+    setActiveResult,
     isProcessing,
-    processImage
+    processImage,
+    processAllImages
   } = useImageProcessor();
   
   const {
@@ -56,7 +60,10 @@ export const ImageTab = () => {
     imageFormats,
     handleDownload,
     processDownload
-  } = useImageDownloader(sourceImageName, sourceImageType);
+  } = useImageDownloader(
+    getActiveImage()?.name || "", 
+    getActiveImage()?.type || ""
+  );
   
   const {
     handleDragStart,
@@ -64,12 +71,13 @@ export const ImageTab = () => {
     handleDragEnd
   } = useDragManager(updateDraggingState, updateWatermark, imageContainerRef);
 
-  // Update download filename when source image name changes
+  // Update download filename when active image changes
   useEffect(() => {
-    if (sourceImageName) {
-      setDownloadFilename(sourceImageName);
+    const activeImage = getActiveImage();
+    if (activeImage?.name) {
+      setDownloadFilename(activeImage.name);
     }
-  }, [sourceImageName, setDownloadFilename]);
+  }, [activeImageIndex, getActiveImage, setDownloadFilename]);
 
   // Set up event listeners for drag operations
   useEffect(() => {
@@ -93,33 +101,38 @@ export const ImageTab = () => {
   // Handle watermark image upload
   const handleWatermarkImageUpload = (src: string) => {
     addWatermark(src);
-    setResultImage(null);
   };
 
-  // Process the image with watermarks
+  // Process the active image with watermarks
   const handleProcessImage = () => {
-    processImage(
-      sourceImage, 
-      watermarks, 
-      sourceImageDimensions, 
-      sourceImageType, 
+    const activeImage = getActiveImage();
+    if (activeImage) {
+      processImage(
+        activeImage, 
+        watermarks, 
+        imageContainerRef
+      );
+    }
+  };
+
+  // Process all images with the same watermarks
+  const handleProcessAllImages = () => {
+    processAllImages(
+      sourceImages,
+      watermarks,
       imageContainerRef
     );
   };
 
-  // Reset all state
-  const resetAll = () => {
-    resetImage();
-    setResultImage(null);
-  };
-
   // Handle download button click
   const handleDownloadClick = () => {
+    const resultImage = getResultImage();
     handleDownload(resultImage);
   };
 
   // Process the download
   const handleProcessDownload = () => {
+    const resultImage = getResultImage();
     processDownload(resultImage);
   };
 
@@ -127,7 +140,7 @@ export const ImageTab = () => {
     <div className={`grid ${isMobile ? 'grid-cols-1 gap-6' : 'grid-cols-[1fr_380px] gap-8'}`}>
       <div className="flex flex-col gap-4">
         <Card className="p-6 flex flex-col items-center justify-center">
-          {!sourceImage ? (
+          {sourceImages.length === 0 ? (
             <ImageUploader 
               id="source-image-upload"
               onUpload={handleSourceImageUpload}
@@ -136,23 +149,38 @@ export const ImageTab = () => {
             />
           ) : (
             <ImageEditor 
-              sourceImage={sourceImage}
+              sourceImages={sourceImages}
+              activeImageIndex={activeImageIndex}
               watermarks={watermarks}
               onDragStart={handleDragStart}
-              onChangeImage={resetAll}
+              onChangeImage={() => document.getElementById("source-image-upload-additional")?.click()}
               onProcessImage={handleProcessImage}
+              onProcessAllImages={handleProcessAllImages}
+              onRemoveImage={removeImage}
+              onSelectImage={setActiveImage}
               onDownload={handleDownloadClick}
-              resultImage={resultImage}
+              resultImage={getResultImage()}
               isProcessing={isProcessing}
               imageContainerRef={imageContainerRef}
             />
           )}
         </Card>
         
-        {resultImage && (
+        {sourceImages.length > 0 && (
+          <div className="hidden">
+            <ImageUploader 
+              id="source-image-upload-additional"
+              onUpload={handleSourceImageUpload}
+              buttonText="Add Another Image"
+              description="Upload additional images"
+            />
+          </div>
+        )}
+        
+        {getResultImage() && (
           <Card className="p-6">
             <ResultPreview 
-              resultImage={resultImage} 
+              resultImage={getResultImage()} 
               onDownload={handleDownloadClick} 
             />
           </Card>

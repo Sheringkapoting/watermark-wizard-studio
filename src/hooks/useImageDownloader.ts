@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
 import { ImageFormat } from "@/types/watermark";
 
@@ -8,6 +8,13 @@ export const useImageDownloader = (sourceImageName: string, sourceImageType: str
   const [downloadFilename, setDownloadFilename] = useState(sourceImageName || "");
   const [selectedFormat, setSelectedFormat] = useState<string>("original");
   const [imageQuality, setImageQuality] = useState<number>(0.9);
+
+  // Update filename when source changes
+  useEffect(() => {
+    if (sourceImageName) {
+      setDownloadFilename(sourceImageName);
+    }
+  }, [sourceImageName]);
 
   const imageFormats: ImageFormat[] = [
     { type: "original", quality: 0.9, label: "Original Format" },

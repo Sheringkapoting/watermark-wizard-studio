@@ -2,19 +2,34 @@
 import { useState, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
 import { Watermark } from "@/types/watermark";
+import type { SourceImage } from "@/hooks/useImageUploader";
+
+export interface ProcessedImage {
+  sourceId: string;
+  resultSrc: string;
+}
 
 export const useImageProcessor = () => {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [resultImage, setResultImage] = useState<string | null>(null);
+  const [processedImages, setProcessedImages] = useState<ProcessedImage[]>([]);
+  const [activeResultIndex, setActiveResultIndex] = useState<number>(0);
+
+  const getResultImage = (): string | null => {
+    return processedImages.length > 0 ? processedImages[activeResultIndex].resultSrc : null;
+  };
+
+  const setActiveResult = (index: number) => {
+    if (index >= 0 && index < processedImages.length) {
+      setActiveResultIndex(index);
+    }
+  };
 
   const processImage = useCallback(async (
-    sourceImage: string | null, 
+    sourceImage: SourceImage | null, 
     watermarks: Watermark[], 
-    sourceImageDimensions: {width: number, height: number} | null,
-    sourceImageType: string,
     previewContainerRef: React.RefObject<HTMLDivElement>
   ) => {
-    if (!sourceImage || watermarks.length === 0 || !sourceImageDimensions) {
+    if (!sourceImage || watermarks.length === 0 || !sourceImage.dimensions) {
       toast({
         title: "Missing Images",
         description: watermarks.length === 0 
@@ -27,7 +42,7 @@ export const useImageProcessor = () => {
 
     setIsProcessing(true);
     try {
-      // First, we need to get the reference size from the preview container
+      // Get the reference size from the preview container
       const previewContainer = previewContainerRef.current;
       if (!previewContainer) {
         throw new Error("Preview container reference not found");
@@ -38,8 +53,8 @@ export const useImageProcessor = () => {
       
       // Get the preview scale factor (how much the original image is scaled in the preview)
       const previewScaleFactor = Math.min(
-        previewWidth / sourceImageDimensions.width,
-        previewHeight / sourceImageDimensions.height
+        previewWidth / sourceImage.dimensions.width,
+        previewHeight / sourceImage.dimensions.height
       );
       
       // Load all watermark images
@@ -64,7 +79,7 @@ export const useImageProcessor = () => {
       const sourceImg = new Image();
       await new Promise<void>((resolve) => {
         sourceImg.onload = () => resolve();
-        sourceImg.src = sourceImage;
+        sourceImg.src = sourceImage.src;
       });
       
       // Create the main canvas
@@ -123,13 +138,37 @@ export const useImageProcessor = () => {
       ctx.globalAlpha = 1.0;
       
       // Generate the result image
-      const dataURL = canvas.toDataURL(sourceImageType, 0.9);
-      setResultImage(dataURL);
+      const dataURL = canvas.toDataURL(sourceImage.type, 0.9);
+      
+      // Update the processed images
+      setProcessedImages(prev => {
+        // Check if this image was already processed
+        const existingIndex = prev.findIndex(img => img.sourceId === sourceImage.id);
+        if (existingIndex >= 0) {
+          // Update existing processed image
+          const updated = [...prev];
+          updated[existingIndex] = { sourceId: sourceImage.id, resultSrc: dataURL };
+          return updated;
+        } else {
+          // Add new processed image
+          return [...prev, { sourceId: sourceImage.id, resultSrc: dataURL }];
+        }
+      });
+      
+      // Set active result index to match this image
+      const newIndex = processedImages.findIndex(img => img.sourceId === sourceImage.id);
+      if (newIndex >= 0) {
+        setActiveResultIndex(newIndex);
+      } else {
+        setActiveResultIndex(processedImages.length);
+      }
       
       toast({
         title: "Processing Complete",
         description: "Watermarks have been applied successfully.",
       });
+      
+      return dataURL;
     } catch (error) {
       console.error('Error processing image:', error);
       toast({
@@ -137,15 +176,60 @@ export const useImageProcessor = () => {
         description: "An error occurred while processing the image.",
         variant: "destructive",
       });
+      return null;
     } finally {
       setIsProcessing(false);
     }
-  }, []);
+  }, [processedImages]);
+
+  const processAllImages = useCallback(async (
+    sourceImages: SourceImage[], 
+    watermarks: Watermark[], 
+    previewContainerRef: React.RefObject<HTMLDivElement>
+  ) => {
+    if (sourceImages.length === 0 || watermarks.length === 0) {
+      toast({
+        title: "Missing Images",
+        description: "Please add at least one source image and one watermark.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const results: ProcessedImage[] = [];
+      
+      for (const sourceImage of sourceImages) {
+        const resultSrc = await processImage(sourceImage, watermarks, previewContainerRef);
+        if (resultSrc) {
+          results.push({ sourceId: sourceImage.id, resultSrc });
+        }
+      }
+      
+      toast({
+        title: "Batch Processing Complete",
+        description: `Applied watermarks to ${results.length} of ${sourceImages.length} images.`,
+      });
+    } catch (error) {
+      console.error('Error processing images:', error);
+      toast({
+        title: "Batch Processing Error",
+        description: "An error occurred while processing the images.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [processImage]);
 
   return {
-    resultImage,
-    setResultImage,
+    processedImages,
+    activeResultIndex,
+    getResultImage,
+    setActiveResult,
     isProcessing,
-    processImage
+    processImage,
+    processAllImages
   };
 };

@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 
 interface ResultPreviewProps {
-  resultImage: string;
+  resultImage: string | null;
   onDownload: () => void;
 }
 
 export const ResultPreview = ({ resultImage, onDownload }: ResultPreviewProps) => {
+  if (!resultImage) return null;
+  
   return (
     <div>
       <h2 className="text-xl font-semibold mb-4">Result</h2>
