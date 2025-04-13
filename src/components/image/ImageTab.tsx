@@ -106,106 +106,86 @@ export const ImageTab = () => {
 
     setIsProcessing(true);
     try {
-      // Create canvas with the source image
+      // Load the source image
       const sourceImg = new Image();
-      
-      const sourceLoaded = new Promise((resolve) => {
+      await new Promise((resolve) => {
         sourceImg.onload = resolve;
         sourceImg.src = sourceImage;
       });
       
-      await sourceLoaded;
+      // Create main canvas for the output
+      const mainCanvas = document.createElement('canvas');
+      mainCanvas.width = sourceImg.width;
+      mainCanvas.height = sourceImg.height;
+      const mainCtx = mainCanvas.getContext('2d');
       
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) {
-        throw new Error("Could not get canvas context");
+      if (!mainCtx) {
+        throw new Error("Could not get main canvas context");
       }
       
-      canvas.width = sourceImg.width;
-      canvas.height = sourceImg.height;
+      // Draw the source image
+      mainCtx.drawImage(sourceImg, 0, 0);
       
-      ctx.drawImage(sourceImg, 0, 0);
-      
-      // Load and draw each watermark
-      const watermarkLoadPromises = watermarks.map(watermark => {
-        return new Promise<void>((resolve) => {
-          const watermarkImg = new Image();
-          
-          watermarkImg.onload = () => {
-            // Create a temporary canvas for the watermark to handle rotation properly
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
-            
-            if (!tempCtx) {
-              resolve();
-              return;
-            }
-            
-            // Calculate dimensions based on the watermark's natural size
-            const maxSize = Math.max(watermarkImg.width, watermarkImg.height);
-            const scaledMaxSize = maxSize * watermark.scale;
-            
-            // Make the temp canvas big enough to hold the rotated watermark
-            tempCanvas.width = scaledMaxSize * 2;
-            tempCanvas.height = scaledMaxSize * 2;
-            
-            // Position at the center of the temp canvas
-            const tempCenterX = tempCanvas.width / 2;
-            const tempCenterY = tempCanvas.height / 2;
-            
-            // Draw the watermark on the temp canvas with rotation
-            tempCtx.save();
-            tempCtx.translate(tempCenterX, tempCenterY);
-            tempCtx.rotate((watermark.rotation * Math.PI) / 180);
-            
-            // Calculate the scaled dimensions while maintaining aspect ratio
-            const scaledWidth = watermarkImg.width * watermark.scale;
-            const scaledHeight = watermarkImg.height * watermark.scale;
-            
-            // Draw centered on the temp canvas
-            tempCtx.drawImage(
-              watermarkImg,
-              -scaledWidth / 2,
-              -scaledHeight / 2,
-              scaledWidth,
-              scaledHeight
-            );
-            tempCtx.restore();
-            
-            // Now draw the temp canvas onto the main canvas at the correct position
-            ctx.globalAlpha = watermark.opacity;
-            
-            // Calculate the position on the main canvas
-            const posX = canvas.width * watermark.position.x;
-            const posY = canvas.height * watermark.position.y;
-            
-            // Draw the temp canvas onto the main canvas
-            ctx.drawImage(
-              tempCanvas,
-              posX - tempCanvas.width / 2,
-              posY - tempCanvas.height / 2
-            );
-            
-            // Reset the global alpha
-            ctx.globalAlpha = 1.0;
-            
-            resolve();
-          };
-          
+      // Process each watermark
+      for (const watermark of watermarks) {
+        // Load the watermark image
+        const watermarkImg = new Image();
+        await new Promise<void>((resolve, reject) => {
+          watermarkImg.onload = () => resolve();
           watermarkImg.onerror = () => {
-            console.error(`Failed to load watermark image: ${watermark.id}`);
-            resolve();
+            console.error(`Failed to load watermark: ${watermark.id}`);
+            resolve(); // Continue with other watermarks
           };
-          
           watermarkImg.src = watermark.src;
         });
-      });
+        
+        try {
+          // Get original dimensions
+          const originalWidth = watermarkImg.width;
+          const originalHeight = watermarkImg.height;
+          
+          // Calculate scaled dimensions (before rotation)
+          const scaledWidth = originalWidth * watermark.scale;
+          const scaledHeight = originalHeight * watermark.scale;
+          
+          // Calculate the absolute position on the main canvas
+          const posX = mainCanvas.width * watermark.position.x;
+          const posY = mainCanvas.height * watermark.position.y;
+          
+          // Set opacity
+          mainCtx.globalAlpha = watermark.opacity;
+          
+          // Save current context state
+          mainCtx.save();
+          
+          // Move to the position where we want the center of the watermark to be
+          mainCtx.translate(posX, posY);
+          
+          // Apply rotation around this center point
+          mainCtx.rotate((watermark.rotation * Math.PI) / 180);
+          
+          // Draw the watermark centered at the origin (which we've translated to the desired position)
+          // This matches the CSS transform with translate(-50%, -50%)
+          mainCtx.drawImage(
+            watermarkImg,
+            -scaledWidth / 2,
+            -scaledHeight / 2,
+            scaledWidth,
+            scaledHeight
+          );
+          
+          // Restore context to previous state
+          mainCtx.restore();
+          
+          // Reset global alpha for next operations
+          mainCtx.globalAlpha = 1.0;
+        } catch (err) {
+          console.error('Error processing watermark:', err);
+        }
+      }
       
-      await Promise.all(watermarkLoadPromises);
-      
-      const dataURL = canvas.toDataURL(sourceImageType, 0.9);
+      // Generate the final image
+      const dataURL = mainCanvas.toDataURL(sourceImageType, 0.9);
       setResultImage(dataURL);
       
       toast({
