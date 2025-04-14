@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -28,6 +27,7 @@ export const ImageTab = () => {
     handleMultipleSourceImagesUpload,
     removeImage,
     setActiveImage,
+    updateImage,
     resetImages
   } = useImageUploader();
   
@@ -162,6 +162,7 @@ export const ImageTab = () => {
               onRemoveImage={removeImage}
               onSelectImage={setActiveImage}
               onDownload={handleDownloadClick}
+              onUpdateImage={updateImage}
               resultImage={getResultImage()}
               isProcessing={isProcessing}
               imageContainerRef={imageContainerRef}

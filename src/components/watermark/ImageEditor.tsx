@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Watermark } from "@/types/watermark";
 import { WatermarkImage } from "./WatermarkImage";
 import { ImageSelector } from "./ImageSelector";
+import { BackgroundRemovalTool } from "./BackgroundRemovalTool";
 import type { SourceImage } from "@/hooks/useImageUploader";
 
 interface ImageEditorProps {
@@ -17,6 +18,7 @@ interface ImageEditorProps {
   onRemoveImage: (id: string) => void;
   onSelectImage: (index: number) => void;
   onDownload: () => void;
+  onUpdateImage: (imageId: string, newImageSrc: string) => void;
   resultImage: string | null;
   isProcessing: boolean;
   imageContainerRef?: React.RefObject<HTMLDivElement>;
@@ -33,11 +35,18 @@ export const ImageEditor = ({
   onRemoveImage,
   onSelectImage,
   onDownload,
+  onUpdateImage,
   resultImage,
   isProcessing,
   imageContainerRef
 }: ImageEditorProps) => {
   const activeImage = sourceImages[activeImageIndex];
+
+  const handleBackgroundRemoved = (newImageSrc: string) => {
+    if (activeImage) {
+      onUpdateImage(activeImage.id, newImageSrc);
+    }
+  };
 
   return (
     <div className="w-full relative">
@@ -66,13 +75,22 @@ export const ImageEditor = ({
         onRemoveImage={onRemoveImage}
       />
 
-      <div className="flex justify-between mt-4">
-        <Button
-          variant="outline"
-          onClick={onChangeImage}
-        >
-          Add Image
-        </Button>
+      <div className="flex flex-wrap justify-between mt-4 gap-2">
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={onChangeImage}
+          >
+            Add Image
+          </Button>
+          
+          {activeImage && (
+            <BackgroundRemovalTool 
+              imageUrl={activeImage.src}
+              onProcessed={handleBackgroundRemoved}
+            />
+          )}
+        </div>
         
         <div className="flex gap-2">
           <Button

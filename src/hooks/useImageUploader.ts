@@ -42,6 +42,19 @@ export const useImageUploader = () => {
     setActiveImageIndex(sourceImages.length); // Set the newly added image as active
   };
 
+  const updateImage = async (imageId: string, newImageSrc: string) => {
+    const imageToUpdate = sourceImages.find(img => img.id === imageId);
+    if (!imageToUpdate) return;
+    
+    const dimensions = await loadSourceImage(newImageSrc);
+    
+    setSourceImages(prev => prev.map(img => 
+      img.id === imageId 
+        ? { ...img, src: newImageSrc, dimensions } 
+        : img
+    ));
+  };
+
   const handleMultipleSourceImagesUpload = async (files: { src: string, name: string, type: string }[]) => {
     if (files.length === 0) return;
     
@@ -101,6 +114,7 @@ export const useImageUploader = () => {
     handleMultipleSourceImagesUpload,
     removeImage,
     setActiveImage,
+    updateImage,
     resetImages
   };
 };
