@@ -1,5 +1,4 @@
 import React, { useEffect, useRef } from "react";
-import { Card } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWatermarkManager } from "@/hooks/useWatermarkManager";
 import { useImageProcessor } from "@/hooks/useImageProcessor";
@@ -7,11 +6,8 @@ import { useImageUploader } from "@/hooks/useImageUploader";
 import { useDragManager } from "@/hooks/useDragManager";
 import { useImageDownloader } from "@/hooks/useImageDownloader";
 
-import { ImageUploader } from "@/components/watermark/ImageUploader";
-import { ImageEditor } from "@/components/watermark/ImageEditor";
-import { ResultPreview } from "@/components/watermark/ResultPreview";
-import { WatermarkList } from "@/components/watermark/WatermarkList";
-import { Instructions } from "@/components/watermark/Instructions";
+import { ImageEditorSection } from "./ImageEditorSection";
+import { WatermarkSection } from "./WatermarkSection";
 import { DownloadDialog } from "@/components/watermark/DownloadDialog";
 
 export const ImageTab = () => {
@@ -139,74 +135,30 @@ export const ImageTab = () => {
 
   return (
     <div className={`grid ${isMobile ? 'grid-cols-1 gap-6' : 'grid-cols-[1fr_380px] gap-8'}`}>
-      <div className="flex flex-col gap-4">
-        <Card className="p-6 flex flex-col items-center justify-center">
-          {sourceImages.length === 0 ? (
-            <ImageUploader 
-              id="source-image-upload"
-              onUpload={handleSourceImageUpload}
-              buttonText="Select Images"
-              description="Upload images to add watermarks"
-              multiple={true}
-              onMultipleUpload={handleMultipleSourceImagesUpload}
-            />
-          ) : (
-            <ImageEditor 
-              sourceImages={sourceImages}
-              activeImageIndex={activeImageIndex}
-              watermarks={watermarks}
-              onDragStart={handleDragStart}
-              onChangeImage={() => document.getElementById("source-image-upload-additional")?.click()}
-              onProcessImage={handleProcessImage}
-              onProcessAllImages={handleProcessAllImages}
-              onRemoveImage={removeImage}
-              onSelectImage={setActiveImage}
-              onDownload={handleDownloadClick}
-              onUpdateImage={updateImage}
-              resultImage={getResultImage()}
-              isProcessing={isProcessing}
-              imageContainerRef={imageContainerRef}
-            />
-          )}
-        </Card>
-        
-        {sourceImages.length > 0 && (
-          <div className="hidden">
-            <ImageUploader 
-              id="source-image-upload-additional"
-              onUpload={handleSourceImageUpload}
-              buttonText="Add Another Image"
-              description="Upload additional images"
-              multiple={true}
-              onMultipleUpload={handleMultipleSourceImagesUpload}
-            />
-          </div>
-        )}
-        
-        {getResultImage() && (
-          <Card className="p-6">
-            <ResultPreview 
-              resultImage={getResultImage()} 
-              onDownload={handleDownloadClick} 
-            />
-          </Card>
-        )}
-      </div>
+      <ImageEditorSection
+        sourceImages={sourceImages}
+        activeImageIndex={activeImageIndex}
+        watermarks={watermarks}
+        onDragStart={handleDragStart}
+        onSourceImageUpload={handleSourceImageUpload}
+        onMultipleSourceImagesUpload={handleMultipleSourceImagesUpload}
+        onProcessImage={handleProcessImage}
+        onProcessAllImages={handleProcessAllImages}
+        onRemoveImage={removeImage}
+        onSelectImage={setActiveImage}
+        onDownload={handleDownloadClick}
+        onUpdateImage={updateImage}
+        resultImage={getResultImage()}
+        isProcessing={isProcessing}
+        imageContainerRef={imageContainerRef}
+      />
       
-      <div className="flex flex-col gap-4">
-        <Card className="p-6">
-          <WatermarkList 
-            watermarks={watermarks}
-            onWatermarkUpload={handleWatermarkImageUpload}
-            onWatermarkRemove={removeWatermark}
-            onWatermarkUpdate={updateWatermark}
-          />
-        </Card>
-        
-        <Card className="p-6">
-          <Instructions />
-        </Card>
-      </div>
+      <WatermarkSection
+        watermarks={watermarks}
+        onWatermarkUpload={handleWatermarkImageUpload}
+        onWatermarkRemove={removeWatermark}
+        onWatermarkUpdate={updateWatermark}
+      />
       
       <DownloadDialog
         open={downloadDialogOpen}
