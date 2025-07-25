@@ -5,6 +5,7 @@ import { VideoClip, VideoSegment, VideoEditorState } from "@/types/video";
 import { VideoPreview, VideoPreviewRef } from "./VideoPreview";
 import { VideoTimeline } from "./VideoTimeline";
 import { VideoControls } from "./VideoControls";
+import { VideoToolbar } from "./VideoToolbar";
 import { toast } from "@/hooks/use-toast";
 
 interface VideoEditorProps {
@@ -34,6 +35,12 @@ export const VideoEditor = ({
     segments: [],
     selectedSegmentId: null,
     zoom: 1
+  });
+
+  const [toolbarState, setToolbarState] = useState({
+    isAudioMuted: false,
+    canUndo: false,
+    canRedo: false
   });
 
   useEffect(() => {
@@ -151,8 +158,114 @@ export const VideoEditor = ({
     onTrim(firstSegment.startTime, firstSegment.endTime);
   };
 
+  // Toolbar handlers
+  const handleCut = () => {
+    toast({
+      title: "Cut Tool",
+      description: "Cut/trim functionality activated",
+    });
+  };
+
+  const handleUndo = () => {
+    toast({
+      title: "Undo",
+      description: "Last action undone",
+    });
+  };
+
+  const handleRedo = () => {
+    toast({
+      title: "Redo",
+      description: "Action redone",
+    });
+  };
+
+  const handleToggleAudio = () => {
+    setToolbarState(prev => ({
+      ...prev,
+      isAudioMuted: !prev.isAudioMuted
+    }));
+    toast({
+      title: toolbarState.isAudioMuted ? "Audio Enabled" : "Audio Muted",
+      description: toolbarState.isAudioMuted ? "Audio has been unmuted" : "Audio has been muted",
+    });
+  };
+
+  const handleAddText = () => {
+    toast({
+      title: "Add Text",
+      description: "Text overlay tool activated",
+    });
+  };
+
+  const handleAddImage = () => {
+    toast({
+      title: "Add Image",
+      description: "Image overlay tool activated",
+    });
+  };
+
+  const handleAddEffect = () => {
+    toast({
+      title: "Add Effect",
+      description: "Video effects tool activated",
+    });
+  };
+
+  const handleCrop = () => {
+    toast({
+      title: "Crop Tool",
+      description: "Video crop tool activated",
+    });
+  };
+
+  const handleCopy = () => {
+    if (editorState.selectedSegmentId) {
+      toast({
+        title: "Segment Copied",
+        description: "Selected segment copied to clipboard",
+      });
+    } else {
+      toast({
+        title: "No Selection",
+        description: "Please select a segment to copy",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDelete = () => {
+    if (editorState.selectedSegmentId) {
+      handleDeleteSegment(editorState.selectedSegmentId);
+    } else {
+      toast({
+        title: "No Selection",
+        description: "Please select a segment to delete",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="w-full space-y-6">
+      {/* Video Toolbar */}
+      <VideoToolbar
+        videoClip={videoClip}
+        onCut={handleCut}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        onToggleAudio={handleToggleAudio}
+        onAddText={handleAddText}
+        onAddImage={handleAddImage}
+        onAddEffect={handleAddEffect}
+        onCrop={handleCrop}
+        onCopy={handleCopy}
+        onDelete={handleDelete}
+        isAudioMuted={toolbarState.isAudioMuted}
+        canUndo={toolbarState.canUndo}
+        canRedo={toolbarState.canRedo}
+      />
+
       {/* Video Preview */}
       <VideoPreview
         ref={videoPreviewRef}
