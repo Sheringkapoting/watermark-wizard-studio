@@ -1,10 +1,11 @@
 
 import React, { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
-import { VideoClip, VideoTrimming } from "@/types/video";
-import { Play, Pause, Scissors, Download } from "lucide-react";
-import { formatTime } from "@/lib/utils";
+import { VideoClip, VideoSegment, VideoEditorState } from "@/types/video";
+import { VideoPreview, VideoPreviewRef } from "./VideoPreview";
+import { VideoTimeline } from "./VideoTimeline";
+import { VideoControls } from "./VideoControls";
+import { toast } from "@/hooks/use-toast";
 
 interface VideoEditorProps {
   videoClip: VideoClip;
@@ -12,194 +13,185 @@ interface VideoEditorProps {
   onChangeVideo: () => void;
 }
 
+const generateRandomColor = () => {
+  const colors = [
+    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
+    '#06B6D4', '#84CC16', '#F97316', '#EC4899', '#6366F1'
+  ];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
+
 export const VideoEditor = ({ 
   videoClip, 
   onTrim, 
   onChangeVideo 
 }: VideoEditorProps) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [trimming, setTrimming] = useState<VideoTrimming>({
+  const videoPreviewRef = useRef<VideoPreviewRef>(null);
+  
+  const [editorState, setEditorState] = useState<VideoEditorState>({
     currentTime: 0,
-    startTrim: 0,
-    endTrim: videoClip.duration,
+    isPlaying: false,
+    segments: [],
+    selectedSegmentId: null,
+    zoom: 1
   });
-  const [isSeeking, setIsSeeking] = useState(false);
 
   useEffect(() => {
-    // Update end trim when video duration changes
-    setTrimming(prev => ({
+    // Reset editor state when video changes
+    setEditorState({
+      currentTime: 0,
+      isPlaying: false,
+      segments: [],
+      selectedSegmentId: null,
+      zoom: 1
+    });
+  }, [videoClip.id]);
+
+  const handleTimeUpdate = (time: number) => {
+    setEditorState(prev => ({
       ...prev,
-      endTrim: videoClip.duration
-    }));
-  }, [videoClip.duration]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const updateTime = () => {
-      setTrimming(prev => ({
-        ...prev,
-        currentTime: video.currentTime
-      }));
-    };
-
-    const handleEnd = () => {
-      setIsPlaying(false);
-    };
-
-    video.addEventListener('timeupdate', updateTime);
-    video.addEventListener('ended', handleEnd);
-
-    return () => {
-      video.removeEventListener('timeupdate', updateTime);
-      video.removeEventListener('ended', handleEnd);
-    };
-  }, []);
-
-  // When seeking on the timeline
-  const handleTimelineChange = (value: number[]) => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = value[0];
-      setTrimming(prev => ({
-        ...prev,
-        currentTime: value[0]
-      }));
-    }
-  };
-
-  const handleTrimStartChange = (value: number[]) => {
-    setTrimming(prev => ({
-      ...prev,
-      startTrim: Math.min(value[0], prev.endTrim - 1)
+      currentTime: time
     }));
   };
 
-  const handleTrimEndChange = (value: number[]) => {
-    setTrimming(prev => ({
+  const handlePlayToggle = () => {
+    setEditorState(prev => ({
       ...prev,
-      endTrim: Math.max(value[0], prev.startTrim + 1)
+      isPlaying: !prev.isPlaying
     }));
   };
 
-  const togglePlay = () => {
-    if (!videoRef.current) return;
-    
-    if (isPlaying) {
-      videoRef.current.pause();
-    } else {
-      // If at the end of the trim range, go back to start
-      if (trimming.currentTime >= trimming.endTrim) {
-        videoRef.current.currentTime = trimming.startTrim;
-      }
-      
-      // Check if we're before the start trim
-      if (trimming.currentTime < trimming.startTrim) {
-        videoRef.current.currentTime = trimming.startTrim;
-      }
-      
-      videoRef.current.play();
-    }
-    
-    setIsPlaying(!isPlaying);
+  const handleSeek = (time: number) => {
+    setEditorState(prev => ({
+      ...prev,
+      currentTime: time
+    }));
+    videoPreviewRef.current?.seek(time);
   };
 
-  useEffect(() => {
-    // Watch for current time reaching end trim
-    if (isPlaying && trimming.currentTime >= trimming.endTrim && videoRef.current) {
-      videoRef.current.pause();
-      setIsPlaying(false);
-    }
-  }, [trimming.currentTime, trimming.endTrim, isPlaying]);
+  const handleAddSegment = () => {
+    const newSegment: VideoSegment = {
+      id: `segment-${Date.now()}`,
+      startTime: editorState.currentTime,
+      endTime: Math.min(editorState.currentTime + 10, videoClip.duration),
+      color: generateRandomColor(),
+      name: `Segment ${editorState.segments.length + 1}`
+    };
 
-  const handleTrimmingComplete = () => {
-    onTrim(trimming.startTrim, trimming.endTrim);
+    setEditorState(prev => ({
+      ...prev,
+      segments: [...prev.segments, newSegment],
+      selectedSegmentId: newSegment.id
+    }));
+
+    toast({
+      title: "Segment Added",
+      description: `New segment created at ${newSegment.startTime.toFixed(2)}s`,
+    });
+  };
+
+  const handleSegmentMove = (segmentId: string, startTime: number, endTime: number) => {
+    setEditorState(prev => ({
+      ...prev,
+      segments: prev.segments.map(segment =>
+        segment.id === segmentId
+          ? { ...segment, startTime, endTime }
+          : segment
+      )
+    }));
+  };
+
+  const handleSegmentSelect = (segmentId: string | null) => {
+    setEditorState(prev => ({
+      ...prev,
+      selectedSegmentId: segmentId
+    }));
+  };
+
+  const handleDeleteSegment = (segmentId: string) => {
+    setEditorState(prev => ({
+      ...prev,
+      segments: prev.segments.filter(s => s.id !== segmentId),
+      selectedSegmentId: prev.selectedSegmentId === segmentId ? null : prev.selectedSegmentId
+    }));
+
+    toast({
+      title: "Segment Deleted",
+      description: "Segment removed from timeline",
+    });
+  };
+
+  const handleZoomChange = (zoom: number) => {
+    setEditorState(prev => ({
+      ...prev,
+      zoom
+    }));
+  };
+
+  const handleSaveProject = () => {
+    // TODO: Implement project saving
+    toast({
+      title: "Project Saved",
+      description: "Your project has been saved successfully",
+    });
+  };
+
+  const handleExportVideo = () => {
+    if (editorState.segments.length === 0) {
+      toast({
+        title: "No Segments",
+        description: "Please add at least one segment to export",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Export the first segment for now
+    const firstSegment = editorState.segments[0];
+    onTrim(firstSegment.startTime, firstSegment.endTime);
   };
 
   return (
-    <div className="w-full">
-      <div className="relative rounded-md overflow-hidden bg-black">
-        <video
-          ref={videoRef}
-          src={videoClip.src}
-          className="w-full h-auto max-h-[60vh]"
-          onClick={togglePlay}
+    <div className="w-full space-y-6">
+      {/* Video Preview */}
+      <VideoPreview
+        ref={videoPreviewRef}
+        videoClip={videoClip}
+        currentTime={editorState.currentTime}
+        isPlaying={editorState.isPlaying}
+        onTimeUpdate={handleTimeUpdate}
+        onPlayToggle={handlePlayToggle}
+        onSeek={handleSeek}
+      />
+
+      {/* Timeline */}
+      <div className="overflow-x-auto">
+        <VideoTimeline
+          videoClip={videoClip}
+          currentTime={editorState.currentTime}
+          segments={editorState.segments}
+          selectedSegmentId={editorState.selectedSegmentId}
+          zoom={editorState.zoom}
+          onTimeChange={handleSeek}
+          onSegmentSelect={handleSegmentSelect}
+          onSegmentMove={handleSegmentMove}
         />
-        
-        <div className="absolute bottom-4 left-4 right-4 bg-black/50 p-2 rounded-md flex items-center">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-white"
-            onClick={togglePlay}
-          >
-            {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-          </Button>
-          <div className="text-white text-xs ml-2 min-w-[80px]">
-            {formatTime(trimming.currentTime)} / {formatTime(videoClip.duration)}
-          </div>
-        </div>
       </div>
 
-      <div className="mt-6 space-y-6">
-        <div>
-          <div className="flex justify-between mb-2 text-sm font-medium">
-            <span>Timeline</span>
-            <span>{formatTime(trimming.currentTime)}</span>
-          </div>
-          <Slider
-            min={0}
-            max={videoClip.duration}
-            step={0.01}
-            value={[trimming.currentTime]}
-            onValueChange={handleTimelineChange}
-            className="cursor-grab active:cursor-grabbing"
-          />
-        </div>
+      {/* Controls */}
+      <VideoControls
+        segments={editorState.segments}
+        selectedSegmentId={editorState.selectedSegmentId}
+        zoom={editorState.zoom}
+        onZoomChange={handleZoomChange}
+        onAddSegment={handleAddSegment}
+        onDeleteSegment={handleDeleteSegment}
+        onSaveProject={handleSaveProject}
+        onExportVideo={handleExportVideo}
+      />
 
-        <div>
-          <div className="flex justify-between mb-2 text-sm font-medium">
-            <span>Trim Range</span>
-            <span>{formatTime(trimming.startTrim)} - {formatTime(trimming.endTrim)}</span>
-          </div>
-          <div className="relative pt-5">
-            {/* Background track */}
-            <div className="absolute w-full h-2 bg-gray-200 rounded-full" />
-            
-            {/* Selected range */}
-            <div 
-              className="absolute h-2 bg-primary rounded-full" 
-              style={{
-                left: `${(trimming.startTrim / videoClip.duration) * 100}%`,
-                width: `${((trimming.endTrim - trimming.startTrim) / videoClip.duration) * 100}%`
-              }}
-            />
-            
-            {/* Start trim handle */}
-            <Slider
-              min={0}
-              max={videoClip.duration}
-              step={0.01}
-              value={[trimming.startTrim]}
-              onValueChange={handleTrimStartChange}
-              className="absolute w-full cursor-grab active:cursor-grabbing"
-            />
-            
-            {/* End trim handle */}
-            <Slider
-              min={0}
-              max={videoClip.duration}
-              step={0.01}
-              value={[trimming.endTrim]}
-              onValueChange={handleTrimEndChange}
-              className="absolute w-full cursor-grab active:cursor-grabbing"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="flex justify-between mt-6">
+      {/* Action Buttons */}
+      <div className="flex justify-between pt-4 border-t">
         <Button
           variant="outline"
           onClick={onChangeVideo}
@@ -209,19 +201,10 @@ export const VideoEditor = ({
         
         <div className="flex gap-2">
           <Button
-            onClick={handleTrimmingComplete}
-            className="flex items-center"
+            onClick={handleAddSegment}
+            className="flex items-center gap-2"
           >
-            <Scissors className="h-4 w-4 mr-2" />
-            Trim Clip
-          </Button>
-          
-          <Button
-            variant="secondary"
-            className="flex items-center"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Download
+            Add New Segment
           </Button>
         </div>
       </div>
