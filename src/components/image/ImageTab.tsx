@@ -1,9 +1,8 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWatermarkManager } from "@/hooks/useWatermarkManager";
 import { useImageProcessor } from "@/hooks/useImageProcessor";
 import { useImageUploader } from "@/hooks/useImageUploader";
-import { useDragManager } from "@/hooks/useDragManager";
 import { useImageDownloader } from "@/hooks/useImageDownloader";
 
 import { ImageEditorSection } from "./ImageEditorSection";
@@ -12,7 +11,6 @@ import { DownloadDialog } from "@/components/watermark/DownloadDialog";
 
 export const ImageTab = () => {
   const isMobile = useIsMobile();
-  const imageContainerRef = useRef<HTMLDivElement>(null);
   
   // Custom hooks
   const {
@@ -31,8 +29,7 @@ export const ImageTab = () => {
     watermarks,
     addWatermark,
     removeWatermark,
-    updateWatermark,
-    updateDraggingState
+    updateWatermark
   } = useWatermarkManager();
   
   const {
@@ -61,12 +58,6 @@ export const ImageTab = () => {
     getActiveImage()?.name || "", 
     getActiveImage()?.type || ""
   );
-  
-  const {
-    handleDragStart,
-    handleDrag,
-    handleDragEnd
-  } = useDragManager(updateDraggingState, updateWatermark, imageContainerRef);
 
   // Update download filename when active image changes
   useEffect(() => {
@@ -76,24 +67,6 @@ export const ImageTab = () => {
     }
   }, [activeImageIndex, getActiveImage, setDownloadFilename]);
 
-  // Set up event listeners for drag operations
-  useEffect(() => {
-    const isDragging = watermarks.some(watermark => watermark.isDragging);
-    
-    if (isDragging) {
-      window.addEventListener('mousemove', handleDrag);
-      window.addEventListener('touchmove', handleDrag, { passive: false });
-      window.addEventListener('mouseup', handleDragEnd);
-      window.addEventListener('touchend', handleDragEnd);
-    }
-    
-    return () => {
-      window.removeEventListener('mousemove', handleDrag);
-      window.removeEventListener('touchmove', handleDrag);
-      window.removeEventListener('mouseup', handleDragEnd);
-      window.removeEventListener('touchend', handleDragEnd);
-    };
-  }, [watermarks, handleDrag, handleDragEnd]);
 
   // Handle watermark image upload
   const handleWatermarkImageUpload = (src: string) => {
@@ -104,20 +77,30 @@ export const ImageTab = () => {
   const handleProcessImage = () => {
     const activeImage = getActiveImage();
     if (activeImage) {
+      // Create a temporary container ref for compatibility
+      const tempRef = { current: document.createElement('div') };
+      tempRef.current.style.width = '800px';
+      tempRef.current.style.height = '600px';
+      
       processImage(
         activeImage, 
-        watermarks, 
-        imageContainerRef
+        watermarks,
+        tempRef
       );
     }
   };
 
   // Process all images with the same watermarks
   const handleProcessAllImages = () => {
+    // Create a temporary container ref for compatibility
+    const tempRef = { current: document.createElement('div') };
+    tempRef.current.style.width = '800px';
+    tempRef.current.style.height = '600px';
+    
     processAllImages(
       sourceImages,
       watermarks,
-      imageContainerRef
+      tempRef
     );
   };
 
@@ -139,7 +122,6 @@ export const ImageTab = () => {
         sourceImages={sourceImages}
         activeImageIndex={activeImageIndex}
         watermarks={watermarks}
-        onDragStart={handleDragStart}
         onSourceImageUpload={handleSourceImageUpload}
         onMultipleSourceImagesUpload={handleMultipleSourceImagesUpload}
         onProcessImage={handleProcessImage}
@@ -148,16 +130,15 @@ export const ImageTab = () => {
         onSelectImage={setActiveImage}
         onDownload={handleDownloadClick}
         onUpdateImage={updateImage}
+        onWatermarkUpdate={updateWatermark}
         resultImage={getResultImage()}
         isProcessing={isProcessing}
-        imageContainerRef={imageContainerRef}
       />
       
       <WatermarkSection
         watermarks={watermarks}
         onWatermarkUpload={handleWatermarkImageUpload}
         onWatermarkRemove={removeWatermark}
-        onWatermarkUpdate={updateWatermark}
       />
       
       <DownloadDialog
