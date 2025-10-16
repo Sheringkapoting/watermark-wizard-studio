@@ -43,6 +43,11 @@ export const VideoEditor = ({
     canRedo: false
   });
 
+  const [history, setHistory] = useState<VideoEditorState[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [isCutMode, setIsCutMode] = useState(false);
+  const [cropMode, setCropMode] = useState(false);
+
   useEffect(() => {
     // Reset editor state when video changes
     setEditorState({
@@ -52,7 +57,25 @@ export const VideoEditor = ({
       selectedSegmentId: null,
       zoom: 1
     });
+    setHistory([]);
+    setHistoryIndex(-1);
   }, [videoClip.id]);
+
+  // Update undo/redo availability
+  useEffect(() => {
+    setToolbarState(prev => ({
+      ...prev,
+      canUndo: historyIndex > 0,
+      canRedo: historyIndex < history.length - 1
+    }));
+  }, [historyIndex, history.length]);
+
+  const saveToHistory = (state: VideoEditorState) => {
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(state);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
 
   const handleTimeUpdate = (time: number) => {
     setEditorState(prev => ({
@@ -85,11 +108,14 @@ export const VideoEditor = ({
       name: `Segment ${editorState.segments.length + 1}`
     };
 
-    setEditorState(prev => ({
-      ...prev,
-      segments: [...prev.segments, newSegment],
+    const newState = {
+      ...editorState,
+      segments: [...editorState.segments, newSegment],
       selectedSegmentId: newSegment.id
-    }));
+    };
+
+    setEditorState(newState);
+    saveToHistory(newState);
 
     toast({
       title: "Segment Added",
@@ -98,14 +124,16 @@ export const VideoEditor = ({
   };
 
   const handleSegmentMove = (segmentId: string, startTime: number, endTime: number) => {
-    setEditorState(prev => ({
-      ...prev,
-      segments: prev.segments.map(segment =>
+    const newState = {
+      ...editorState,
+      segments: editorState.segments.map(segment =>
         segment.id === segmentId
           ? { ...segment, startTime, endTime }
           : segment
       )
-    }));
+    };
+    setEditorState(newState);
+    saveToHistory(newState);
   };
 
   const handleSegmentSelect = (segmentId: string | null) => {
@@ -160,24 +188,61 @@ export const VideoEditor = ({
 
   // Toolbar handlers
   const handleCut = () => {
-    toast({
-      title: "Cut Tool",
-      description: "Cut/trim functionality activated",
-    });
+    if (!editorState.selectedSegmentId) {
+      // Create a new segment from current time for cutting
+      const cutSegment: VideoSegment = {
+        id: `cut-${Date.now()}`,
+        startTime: editorState.currentTime,
+        endTime: Math.min(editorState.currentTime + 5, videoClip.duration),
+        color: generateRandomColor(),
+        name: `Cut ${editorState.segments.length + 1}`
+      };
+
+      const newState = {
+        ...editorState,
+        segments: [...editorState.segments, cutSegment],
+        selectedSegmentId: cutSegment.id
+      };
+
+      setEditorState(newState);
+      saveToHistory(newState);
+      setIsCutMode(true);
+
+      toast({
+        title: "Cut Mode",
+        description: "Select segment edges on timeline to trim. Click again to exit cut mode.",
+      });
+    } else {
+      setIsCutMode(!isCutMode);
+      toast({
+        title: isCutMode ? "Cut Mode Off" : "Cut Mode On",
+        description: isCutMode ? "Cut mode deactivated" : "Adjust segment edges to cut video",
+      });
+    }
   };
 
   const handleUndo = () => {
-    toast({
-      title: "Undo",
-      description: "Last action undone",
-    });
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setEditorState(history[newIndex]);
+      toast({
+        title: "Undo",
+        description: "Last action undone",
+      });
+    }
   };
 
   const handleRedo = () => {
-    toast({
-      title: "Redo",
-      description: "Action redone",
-    });
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      setEditorState(history[newIndex]);
+      toast({
+        title: "Redo",
+        description: "Action redone",
+      });
+    }
   };
 
   const handleToggleAudio = () => {
@@ -213,18 +278,39 @@ export const VideoEditor = ({
   };
 
   const handleCrop = () => {
+    setCropMode(!cropMode);
     toast({
-      title: "Crop Tool",
-      description: "Video crop tool activated",
+      title: cropMode ? "Crop Mode Off" : "Crop Mode On",
+      description: cropMode ? "Crop mode deactivated" : "Crop functionality activated - implementation in progress",
     });
   };
 
   const handleCopy = () => {
     if (editorState.selectedSegmentId) {
-      toast({
-        title: "Segment Copied",
-        description: "Selected segment copied to clipboard",
-      });
+      const segmentToCopy = editorState.segments.find(s => s.id === editorState.selectedSegmentId);
+      if (segmentToCopy) {
+        const copiedSegment: VideoSegment = {
+          ...segmentToCopy,
+          id: `segment-${Date.now()}`,
+          name: `${segmentToCopy.name} (Copy)`,
+          startTime: Math.min(segmentToCopy.endTime, videoClip.duration - (segmentToCopy.endTime - segmentToCopy.startTime))
+        };
+        copiedSegment.endTime = Math.min(copiedSegment.startTime + (segmentToCopy.endTime - segmentToCopy.startTime), videoClip.duration);
+
+        const newState = {
+          ...editorState,
+          segments: [...editorState.segments, copiedSegment],
+          selectedSegmentId: copiedSegment.id
+        };
+
+        setEditorState(newState);
+        saveToHistory(newState);
+
+        toast({
+          title: "Segment Copied",
+          description: "Segment duplicated successfully",
+        });
+      }
     } else {
       toast({
         title: "No Selection",
